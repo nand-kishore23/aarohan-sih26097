@@ -26,3 +26,12 @@ This release is documentation and build-control infrastructure.
 - Configured environment variables templates.
 - Added pytest setup for backend.
 
+
+## 0.3.0 - Grounded AI Intelligence
+
+- Added a configurable server-side Gemini provider abstraction with deterministic fallback.
+- Added session-scoped livelihood profiles, grounded chat APIs, and Hindi/Hinglish capability normalization.
+- Added optional AI4Bharat endpoint adapter and browser-transcript ASR fallback.
+- Preserved existing interview, pathway, community intelligence, and Evidence Brief endpoints.
+- Added AI status, phone-repair, multilingual extraction, ASR fallback, and legacy-route smoke tests.
+- Documented Render configuration, grounding rules, and prototype limitations.

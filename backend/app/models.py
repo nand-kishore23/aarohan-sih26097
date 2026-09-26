@@ -260,3 +260,85 @@ class EvidenceBrief(BaseModel):
     suggested_next_validation: list[str]
     disclaimer_1: str = "AI-assisted analytical brief — human review required"
     disclaimer_2: str = "Prototype demonstration using synthetic data."
+
+
+# ── Conversational AI ────────────────────────────────────────────────
+class CapabilityObservation(BaseModel):
+    """A normalized capability inferred from a beneficiary statement.
+
+    This remains derived conversational input, not qualification evidence.
+    """
+
+    capability: str
+    evidence_text: str
+    provenance: Provenance = Field(
+        default_factory=lambda: Provenance(origin=ProvenanceOrigin.DERIVED)
+    )
+
+
+class LivelihoodProfile(BaseModel):
+    """Session-scoped profile assembled from beneficiary conversation."""
+
+    language: str = "hi"
+    raw_statements: list[str] = []
+    current_livelihood: Optional[str] = None
+    informal_experience: list[str] = []
+    skills: list[SkillObservation] = []
+    capabilities: list[CapabilityObservation] = []
+    tools_used: list[str] = []
+    tasks_performed: list[str] = []
+    experience_duration: Optional[str] = None
+    education: Optional[str] = None
+    certifications: list[str] = []
+    interests: list[str] = []
+    work_preference: Optional[str] = None
+    mobility: Optional[str] = None
+    physical_constraints: list[str] = []
+    location: Optional[str] = None
+    enterprise_interest: Optional[bool] = None
+    wage_interest: Optional[bool] = None
+    self_employment_interest: Optional[bool] = None
+    missing_information: list[str] = []
+    conversation_state: str = "collecting"
+
+
+class EvidenceRecord(BaseModel):
+    """Structured evidence passed to the conversational reasoning layer."""
+
+    qualification_id: str
+    qualification_name: str
+    qp_code: str
+    nsqf_level: int
+    sector: str
+    verification_status: VerificationStatus
+    source_name: Optional[str] = None
+    source_url: Optional[str] = None
+    relationship: str
+    provenance: Provenance
+
+
+class AIChatRequest(BaseModel):
+    session_id: Optional[str] = None
+    message: str = Field(min_length=1, max_length=4000)
+    language: str = "hi"
+    profile: Optional[LivelihoodProfile] = None
+
+
+class AIChatResponse(BaseModel):
+    session_id: str
+    message: str
+    language: str
+    profile_updates: LivelihoodProfile
+    candidate_pathways: list[CandidatePathway] = []
+    evidence: list[EvidenceRecord] = []
+    questions: list[str] = []
+    next_step: str
+    current_capabilities: list[str] = []
+    transferable_skills: list[str] = []
+    already_demonstrated: list[str] = []
+    needs_verification: list[str] = []
+    verified_gaps: list[str] = []
+    provenance: list[Provenance] = []
+    provider: str
+    mode: str
+    warnings: list[str] = []

@@ -14,6 +14,11 @@ KEYWORD_MAPPING = {
     "dairy": ("dairy_processing", "Dairy handling experience mentioned"),
     "milk": ("milk_testing", "Milk handling experience mentioned"),
     "repair": ("mechanical_troubleshooting", "General repair troubleshooting mentioned"),
+    "phone": ("mobile_phone_repair", "Mobile phone repair experience mentioned"),
+    "mobile": ("mobile_phone_repair", "Mobile phone repair experience mentioned"),
+    "display": ("display_replacement", "Display work experience mentioned"),
+    "charging": ("charging_fault_repair", "Charging-fault work experience mentioned"),
+    "solder": ("soldering", "Soldering experience mentioned"),
 }
 
 

@@ -4,3 +4,5 @@ pytest
 httpx
 pydantic
 pydantic-settings
+google-genai
+python-multipart

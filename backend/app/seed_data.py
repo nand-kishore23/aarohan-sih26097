@@ -276,5 +276,5 @@ DEMO_BENEFICIARY = Beneficiary(
 # In-memory stores (populated at startup)
 # ══════════════════════════════════════════════════════════════════════
 beneficiaries: dict[str, Beneficiary] = {}
-pathway_results: dict[str, list[CandidatePathway]] = {}
+pathway_results: dict[str, CandidatePathway] = {}
 decisions: dict[str, dict] = {}

@@ -1,14 +1,17 @@
 import uuid
 from datetime import datetime
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from ..models import (
     InterviewRequest, InterviewResponse, Beneficiary,
     PathwayRecommendRequest, PathwayRecommendResponse,
-    PathwayDecisionRequest, PathwayDecisionResponse
+    PathwayDecisionRequest, PathwayDecisionResponse, AIChatRequest, AIChatResponse
 )
 from ..skill_engine import extract_skills
 from ..pathway_engine import recommend_pathways
+from ..services.ai.service import ai_service
+from ..services.asr.base import ASRProviderUnavailableError
+from ..services.asr.service import asr_service
 from ..seed_data import (
     beneficiaries, QUALIFICATION_CATALOGUE, DEMO_BENEFICIARY,
     pathway_results, decisions
@@ -122,3 +125,44 @@ def get_community_summary():
 def get_evidence_brief():
     from ..community_engine import generate_evidence_brief
     return generate_evidence_brief()
+
+
+@router.get("/api/ai/status")
+def get_ai_status():
+    """Expose deployment-safe configuration state without revealing credentials."""
+    return ai_service.status()
+
+
+@router.post("/api/ai/chat", response_model=AIChatResponse)
+def chat_with_ai(req: AIChatRequest):
+    """Run grounded conversational reasoning with session-level profile memory."""
+    return ai_service.chat(req)
+
+
+@router.post("/api/ai/analyze", response_model=AIChatResponse)
+def analyze_with_ai(req: AIChatRequest):
+    """Compatibility endpoint for clients that request a structured AI analysis."""
+    return ai_service.chat(req)
+
+
+@router.post("/api/voice/transcribe")
+async def transcribe_voice(
+    audio: UploadFile = File(...),
+    language: str = Form("hi"),
+    fallback_text: str | None = Form(None),
+):
+    """Transcribe through configured ASR, or relay an existing browser transcript."""
+    try:
+        audio_bytes = await audio.read()
+        return asr_service.transcribe(
+            audio=audio_bytes,
+            filename=audio.filename or "audio",
+            content_type=audio.content_type or "application/octet-stream",
+            language=language,
+            fallback_text=fallback_text,
+        )
+    except ASRProviderUnavailableError as exc:
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "ASR_PROVIDER_UNAVAILABLE", "message": str(exc)},
+        ) from exc
