@@ -1,0 +1,97 @@
+{
+  "catalogue_version": "0.1-audit",
+  "status": "AUDIT_IN_PROGRESS",
+  "generated_at": "2026-09-25",
+  "engine_consumable": false,
+  "validation_gate": "COMPLETE_NOS_COMPETENCY_AND_STATUS_AUDIT_REQUIRED",
+  "records": [
+    {
+      "qualification_id": "AGR-Q1108",
+      "qp_code": "AGR/Q1108",
+      "name": "Tractor Mechanic",
+      "record_variant": null,
+      "version": null,
+      "status": "UNRESOLVED_RECORD_VARIANT",
+      "nsqf_level": 4,
+      "sector_council": "Agriculture Skill Council of India",
+      "occupational_area": "Farm Machinery, Equipment Operation and Maintenance",
+      "source": {
+        "name": "NSDC",
+        "source_type": "OFFICIAL_PUBLIC_SOURCE",
+        "source_url": "https://nsdcindia.org/sites/default/files/AGRQ1108_Tractor%20Mechanic_v1_28.05.2018.pdf",
+        "retrieved_at": "2026-09-25",
+        "verification_status": "PARTIAL"
+      },
+      "nos": [],
+      "competencies": [],
+      "eligibility": [],
+      "training": {},
+      "assessment": {},
+      "validation_notes": [
+        "NSDC public content availability shows multiple records under AGR/Q1108.",
+        "Do not use in deterministic matching until the intended current record/version is resolved and competency data is extracted."
+      ]
+    },
+    {
+      "qualification_id": "ELE-Q3115",
+      "qp_code": "ELE/Q3115",
+      "name": "Multi Skill Technician (Electrical)",
+      "record_variant": null,
+      "version": "v1.0",
+      "status": "SOURCE_VALIDATED_PENDING_COMPETENCY_EXTRACTION",
+      "nsqf_level": 4,
+      "sector_council": "Electronics Sector Skills Council of India",
+      "occupational_area": "After Sales Service",
+      "source": {
+        "name": "NSDC",
+        "source_type": "OFFICIAL_PUBLIC_SOURCE",
+        "source_url": "https://nsdcindia.org/node/33121",
+        "qp_file_reference": "ELE_Q3115_Multi_Skill_Technician_(Electrical)_v1.0_2-3-2021.pdf",
+        "validated_on": "2021-03-02",
+        "retrieved_at": "2026-09-25",
+        "verification_status": "PARTIAL"
+      },
+      "nos": [],
+      "competencies": [],
+      "eligibility": [],
+      "training": {},
+      "assessment": {},
+      "validation_notes": [
+        "Source record and NSQF level identified.",
+        "Complete NOS/competency extraction is still required before engine use."
+      ]
+    },
+    {
+      "qualification_id": "QG-04-FI-02933-2024-V2-FICSI",
+      "qp_code": "QG-04-FI-02933-2024-V2-FICSI",
+      "name": "Dairy Product Processor",
+      "record_variant": "NQR qualification file",
+      "version": "NQR 3.0 / reference code V2-FICSI",
+      "status": "SOURCE_VALIDATED_PENDING_FULL_COMPETENCY_EXTRACTION",
+      "nsqf_level": 4,
+      "sector_council": "Food Industry Capacity & Skill Initiative (FICSI)",
+      "occupational_area": "Dairy Products",
+      "source": {
+        "name": "National Qualification Register",
+        "source_type": "OFFICIAL_PUBLIC_SOURCE",
+        "source_url": "https://www.nqr.gov.in/public/qualification/file/QFile-Dairy%20Product%20Processor.pdf",
+        "nsqc_approval_date": "2024-08-27",
+        "retrieved_at": "2026-09-25",
+        "verification_status": "PARTIAL"
+      },
+      "notional_hours": 900,
+      "nos": [],
+      "competencies": [],
+      "eligibility": [],
+      "training": {
+        "total_hours": 900
+      },
+      "assessment": {},
+      "validation_notes": [
+        "Official NQR qualification file identified.",
+        "Official NSDC QP-NOS booklet lists 900 total notional hours.",
+        "Mandatory/elective NOS and competency extraction remains required before engine use."
+      ]
+    }
+  ]
+}
