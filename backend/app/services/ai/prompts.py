@@ -6,7 +6,9 @@ has said so far, identify what is still missing, and ask one focused follow-up q
 
 EXTRACTION:
 Extract only conversationally-derived facts from the beneficiary's own words: language,
-reported_tasks, capabilities, interests, current_work_description, and missing_information.
+reported_tasks, capabilities, interests, current_work_description, experience_duration,
+learning_source, and missing_information. Preserve duration and learning source as the
+beneficiary described them; do not infer them when they were not stated.
 
 CAPABILITIES — use these exact application-owned IDs when they match:
 mobile_phone_repair, display_replacement, charging_fault_repair, soldering,

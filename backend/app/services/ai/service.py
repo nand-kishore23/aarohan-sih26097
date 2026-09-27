@@ -347,6 +347,12 @@ class AIService:
         profile.interests = list(dict.fromkeys([*profile.interests, *understanding.interests]))
         if understanding.current_work_description:
             profile.current_livelihood = understanding.current_work_description
+        if understanding.experience_duration:
+            profile.experience_duration = understanding.experience_duration
+        if understanding.learning_source:
+            profile.informal_experience = list(
+                dict.fromkeys([*profile.informal_experience, understanding.learning_source])
+            )
         return observations
 
     def _skills_for_capabilities(

@@ -233,10 +233,11 @@ def test_gemini_structured_understanding_is_primary_for_phone_repair_multi_turn(
                 "missing_information": ["repair scope"],
                 "clarification_question": "Phone mein aap kis tarah ka repair karte hain - display, charging, software, ya soldering?",
             },
-            "Display aur charging ka repair karta hoon.": {
+            "Main 3 saal se display aur charging ka repair karta hoon.": {
                 "language": "hi",
                 "reported_tasks": ["display repair", "charging repair"],
                 "capabilities": ["display_replacement", "charging_fault_repair"],
+                "experience_duration": "3 years",
                 "missing_information": ["soldering experience"],
                 "clarification_question": "Kya aap soldering bhi karte hain?",
             },
@@ -260,7 +261,7 @@ def test_gemini_structured_understanding_is_primary_for_phone_repair_multi_turn(
     second = service.chat(
         AIChatRequest(
             session_id=first.session_id,
-            message="Display aur charging ka repair karta hoon.",
+            message="Main 3 saal se display aur charging ka repair karta hoon.",
             language="hi",
         )
     )
@@ -273,6 +274,7 @@ def test_gemini_structured_understanding_is_primary_for_phone_repair_multi_turn(
     )
 
     capability_names = {item.capability for item in third.profile_updates.capabilities}
+    assert third.profile_updates.experience_duration == "3 years"
     assert {"mobile_phone_repair", "display_replacement", "charging_fault_repair", "soldering"}.issubset(capability_names)
     assert len(third.profile_updates.raw_statements) == 3
     assert len(third.profile_updates.self_reported_statements) == 3
