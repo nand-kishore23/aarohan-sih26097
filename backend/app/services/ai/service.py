@@ -240,7 +240,16 @@ class AIService:
             )
         )
         profile.conversation_state = "clarifying" if questions else "evidence_review"
-        candidates, evidence = self._find_relevant_pathways(profile)
+
+        # Gate pathway generation: do not run the deterministic engine while
+        # there are outstanding questions.  This forces multi-turn interview
+        # behaviour — pathways are only generated once the profile is
+        # sufficiently understood.
+        if questions:
+            candidates: list[CandidatePathway] = []
+            evidence: list[EvidenceRecord] = []
+        else:
+            candidates, evidence = self._find_relevant_pathways(profile)
         session.evidence_ids = [item.qualification_id for item in evidence]
         next_step = self._next_step(profile, candidates, questions)
         current_capabilities = [item.capability for item in profile.capabilities]
@@ -372,6 +381,8 @@ class AIService:
     def _clarification_questions(self, profile: LivelihoodProfile) -> list[str]:
         capabilities = {item.capability for item in profile.capabilities}
         hindi = profile.language.lower().startswith("hi")
+
+        # Phone-repair sub-type questions (existing)
         if "mobile_phone_repair" in capabilities:
             if not capabilities.intersection({"display_replacement", "charging_fault_repair"}):
                 return [
@@ -380,12 +391,35 @@ class AIService:
                 ]
             if "soldering" not in capabilities:
                 return ["Kya aap soldering bhi karte hain?" if hindi else "Do you also do soldering?"]
+
+        # Generic sparse-profile questions: if we have capabilities but the
+        # profile is missing basic context that would improve pathway matching.
+        # Deterministic fallback relies on turn counts since it can't populate fields.
+        resolved = {c for c in capabilities if c != "UNRESOLVED_SKILL"}
+        if resolved:
+            if len(profile.raw_statements) == 1:
+                return [
+                    "Aap yeh kaam kitne samay se kar rahe hain?"
+                    if hindi else "How long have you been doing this work?"
+                ]
+            if len(profile.raw_statements) == 2:
+                return [
+                    "Aap naukri dhundh rahe hain ya apna kaam shuru karna chahte hain?"
+                    if hindi else "Are you looking for employment or self-employment?"
+                ]
         return []
 
     def _missing_information(self, questions: list[str]) -> list[str]:
         if not questions:
             return []
-        return ["soldering experience"] if "solder" in questions[0].casefold() else ["specific repair tasks"]
+        q = questions[0].casefold()
+        if "solder" in q:
+            return ["soldering experience"]
+        if "samay" in q or "long" in q:
+            return ["experience duration"]
+        if "naukri" in q or "employment" in q:
+            return ["work preference"]
+        return ["specific repair tasks"]
 
     def _find_relevant_pathways(
         self, profile: LivelihoodProfile

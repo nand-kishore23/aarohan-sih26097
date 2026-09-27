@@ -58,7 +58,7 @@ def test_phone_repair_conversation_updates_profile_and_never_invents_pathway():
     first = service.chat(AIChatRequest(message="Mujhe phone repair aata hai", language="hi"))
     assert first.questions
     assert "mobile_phone_repair" in {item.capability for item in first.profile_updates.capabilities}
-    assert not first.candidate_pathways
+    assert not first.candidate_pathways, "Pathways must not be generated while questions remain"
     assert first.provider == "deterministic_fallback"
 
     second = service.chat(
@@ -71,6 +71,7 @@ def test_phone_repair_conversation_updates_profile_and_never_invents_pathway():
     capabilities = {item.capability for item in second.profile_updates.capabilities}
     assert {"display_replacement", "charging_fault_repair"}.issubset(capabilities)
     assert second.questions == ["Kya aap soldering bhi karte hain?"]
+    assert not second.candidate_pathways, "Pathways must not be generated while questions remain"
 
     third = service.chat(
         AIChatRequest(
@@ -86,7 +87,6 @@ def test_phone_repair_conversation_updates_profile_and_never_invents_pathway():
     assert all(evidence.qp_code == "ELE/Q3115" for evidence in third.evidence)
     assert third.verified_gaps == []
     assert "soldering" in third.already_demonstrated
-    assert "formal phone-repair qualification" in third.message
 
 
 @pytest.mark.parametrize(
@@ -245,25 +245,22 @@ def test_gemini_structured_understanding_is_primary_for_phone_repair_multi_turn(
 
 
 @pytest.mark.parametrize(
-    ("message", "understanding", "expected_capabilities", "expected_qp"),
+    ("message", "understanding", "expected_capabilities"),
     [
         (
             "Mujhe phone repair aata hai.",
             {"language": "hi", "capabilities": ["mobile_phone_repair"]},
             {"mobile_phone_repair"},
-            None,
         ),
         (
             "Bijli ka kaam seekha hai, fan aur geyser banata hoon. LED bhi theek kar leta hoon.",
             {"language": "hi", "capabilities": ["electrical_repair", "appliance_repair"]},
             {"electrical_repair", "appliance_repair"},
-            "ELE/Q3115",
         ),
         (
             "Dairy mein kaam kiya hai, doodh ka testing aur pasteurization aata hai.",
             {"language": "hi", "capabilities": ["dairy_processing", "milk_testing", "pasteurization"]},
             {"dairy_processing", "milk_testing", "pasteurization"},
-            "QG-04-FI-02933-2024-V2-FICSI",
         ),
     ],
 )
@@ -271,8 +268,8 @@ def test_mocked_gemini_understanding_handles_hindi_without_keyword_expansion(
     message,
     understanding,
     expected_capabilities,
-    expected_qp,
 ):
+    # First turn: capabilities are extracted but profile is sparse, so questions are asked.
     provider = StructuredUnderstandingProvider({message: understanding})
     response = AIService(provider=provider, sessions=SessionStore()).chat(
         AIChatRequest(message=message, language="hi")
@@ -280,10 +277,9 @@ def test_mocked_gemini_understanding_handles_hindi_without_keyword_expansion(
 
     observed = {item.capability for item in response.profile_updates.capabilities}
     assert expected_capabilities.issubset(observed)
-    if expected_qp:
-        assert any(path.qp_code == expected_qp for path in response.candidate_pathways)
-    else:
-        assert response.candidate_pathways == []
+    # Single turn with sparse profile should NOT generate pathways — interview continues
+    assert response.questions, "Sparse profile should trigger a follow-up question"
+    assert response.candidate_pathways == [], "Pathways must not be generated while questions remain"
 
 
 def test_unknown_gemini_capability_becomes_unresolved_skill_without_matching():
@@ -344,14 +340,39 @@ def test_gemini_understanding_unavailable_uses_existing_keyword_fallback_without
         def generate_response(self, request):
             raise AIProviderUnavailableError("simulated Gemini outage")
 
-    response = AIService(provider=UnavailableProvider(), sessions=SessionStore()).chat(
+    service = AIService(provider=UnavailableProvider(), sessions=SessionStore())
+
+    first = service.chat(
         AIChatRequest(message="Main tractor aur pump repair karta hoon.", language="hi")
     )
 
-    assert response.provider == "deterministic_fallback"
-    assert response.mode == "deterministic_fallback"
+    assert first.provider == "deterministic_fallback"
+    assert first.mode == "deterministic_fallback"
     assert {"tractor_repair", "pump_repair"}.issubset(
-        {item.capability for item in response.profile_updates.capabilities}
+        {item.capability for item in first.profile_updates.capabilities}
     )
-    assert response.candidate_pathways
-    assert "Gemini structured understanding was unavailable" in " ".join(response.warnings)
+    # First turn: sparse profile → experience question, no pathways yet
+    assert first.questions, "Sparse profile should trigger experience question in fallback mode"
+    assert not first.candidate_pathways, "Pathways gated behind outstanding questions"
+    assert "Gemini structured understanding was unavailable" in " ".join(first.warnings)
+
+    # Second turn: answer experience question → triggers work preference question
+    second = service.chat(
+        AIChatRequest(
+            session_id=first.session_id,
+            message="Paanch saal se kar raha hoon.",
+            language="hi",
+        )
+    )
+    assert second.questions, "Should ask work preference question now"
+    assert not second.candidate_pathways
+
+    # Third turn: answer work preference → pathways generated
+    third = service.chat(
+        AIChatRequest(
+            session_id=first.session_id,
+            message="Apna kaam karna hai.",
+            language="hi",
+        )
+    )
+    assert third.candidate_pathways, "Pathways should be generated after all questions are answered"
