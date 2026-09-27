@@ -23,6 +23,7 @@ from ...models import (
 from ...pathway_engine import recommend_pathways
 from ...seed_data import QUALIFICATION_CATALOGUE
 from ...skill_engine import extract_skills
+from ..latency import timed
 from .base import AIProvider, AIProviderError
 from .gemini import GeminiProvider
 from .schemas import (
@@ -180,12 +181,13 @@ class AIService:
         }
 
     def chat(self, request: AIChatRequest) -> AIChatResponse:
-        session_id, session = self._sessions.get_or_create(request.session_id, request.language, request.profile)
-        profile = session.profile
-        profile.language = request.language or profile.language
-        profile.raw_statements.append(request.message)
-        profile.self_reported_statements.append(ReportedStatement(text=request.message))
-        session.recent_messages = [*session.recent_messages[-3:], request.message]
+        with timed("ai_chat", "profile_prepare"):
+            session_id, session = self._sessions.get_or_create(request.session_id, request.language, request.profile)
+            profile = session.profile
+            profile.language = request.language or profile.language
+            profile.raw_statements.append(request.message)
+            profile.self_reported_statements.append(ReportedStatement(text=request.message))
+            session.recent_messages = [*session.recent_messages[-3:], request.message]
 
         warnings: list[str] = []
         provider_name = "deterministic_fallback"
@@ -193,17 +195,19 @@ class AIService:
         provider: AIProvider | None = None
         understanding: GeminiUnderstanding | None = None
         try:
-            provider = self._provider_for_request()
+            with timed("ai_chat", "provider_prepare"):
+                provider = self._provider_for_request()
             if provider.configured:
-                understanding = validate_gemini_understanding(
-                    provider.understand(
-                        UnderstandingRequest(
-                            message=request.message,
-                            language=profile.language,
-                            recent_messages=session.recent_messages,
+                with timed("ai_chat", "understanding_dispatch"):
+                    understanding = validate_gemini_understanding(
+                        provider.understand(
+                            UnderstandingRequest(
+                                message=request.message,
+                                language=profile.language,
+                                recent_messages=session.recent_messages,
+                            )
                         )
                     )
-                )
             else:
                 warnings.append("Gemini is not configured; deterministic grounded fallback was used.")
         except ValueError:
@@ -213,42 +217,46 @@ class AIService:
             warnings.append("Gemini structured understanding was unavailable; deterministic fallback was used.")
 
         if understanding is not None:
-            new_capabilities = self._apply_understanding(profile, understanding, request.message)
-            derived_skills = self._skills_for_capabilities(new_capabilities)
-            profile.skills = _merge_unique_by_value(profile.skills, derived_skills, "normalized_skill")
+            with timed("ai_chat", "understanding_apply"):
+                new_capabilities = self._apply_understanding(profile, understanding, request.message)
+                derived_skills = self._skills_for_capabilities(new_capabilities)
+                profile.skills = _merge_unique_by_value(profile.skills, derived_skills, "normalized_skill")
             provider_name = provider.name if provider else provider_name
             mode = "ai_grounded"
         else:
             # Existing deterministic extraction is retained only for Gemini-disabled/unavailable mode.
-            fallback_skills = extract_skills(request.message)
-            profile.skills = _merge_unique_by_value(profile.skills, fallback_skills, "normalized_skill")
-            new_capabilities = _fallback_capabilities(request.message)
-            profile.capabilities = _merge_capabilities(profile.capabilities, new_capabilities)
-            profile.tasks_performed = list(
-                dict.fromkeys([*profile.tasks_performed, *(item.capability for item in new_capabilities)])
-            )
+            with timed("ai_chat", "deterministic_skill_extraction"):
+                fallback_skills = extract_skills(request.message)
+                profile.skills = _merge_unique_by_value(profile.skills, fallback_skills, "normalized_skill")
+                new_capabilities = _fallback_capabilities(request.message)
+                profile.capabilities = _merge_capabilities(profile.capabilities, new_capabilities)
+                profile.tasks_performed = list(
+                    dict.fromkeys([*profile.tasks_performed, *(item.capability for item in new_capabilities)])
+                )
 
-        deterministic_questions = self._clarification_questions(profile)
-        questions = self._questions_from_understanding(understanding, deterministic_questions)
-        profile.missing_information = list(
-            dict.fromkeys(
-                [
-                    *(understanding.missing_information if understanding else []),
-                    *self._missing_information(questions),
-                ]
+        with timed("ai_chat", "interview_state"):
+            deterministic_questions = self._clarification_questions(profile)
+            questions = self._questions_from_understanding(understanding, deterministic_questions)
+            profile.missing_information = list(
+                dict.fromkeys(
+                    [
+                        *(understanding.missing_information if understanding else []),
+                        *self._missing_information(questions),
+                    ]
+                )
             )
-        )
-        profile.conversation_state = "clarifying" if questions else "evidence_review"
+            profile.conversation_state = "clarifying" if questions else "evidence_review"
 
         # Gate pathway generation: do not run the deterministic engine while
         # there are outstanding questions.  This forces multi-turn interview
         # behaviour — pathways are only generated once the profile is
         # sufficiently understood.
-        if questions:
-            candidates: list[CandidatePathway] = []
-            evidence: list[EvidenceRecord] = []
-        else:
-            candidates, evidence = self._find_relevant_pathways(profile)
+        with timed("ai_chat", "evidence_gate"):
+            if questions:
+                candidates: list[CandidatePathway] = []
+                evidence: list[EvidenceRecord] = []
+            else:
+                candidates, evidence = self._find_relevant_pathways(profile)
         session.evidence_ids = [item.qualification_id for item in evidence]
         next_step = self._next_step(profile, candidates, questions)
         current_capabilities = [item.capability for item in profile.capabilities]
@@ -267,27 +275,28 @@ class AIService:
             else:
                 needs_verification.extend(candidate.skill_gaps)
 
-        grounded_request = GroundedConversationRequest(
-            message=request.message,
-            language=profile.language,
-            profile=profile,
-            evidence=evidence,
-            candidate_pathways=candidates,
-            questions=questions,
-            next_step=next_step,
-            accepted_capabilities=[
-                item.capability
-                for item in profile.capabilities
-                if item.capability != "UNRESOLVED_SKILL"
-            ],
-            unresolved_capabilities=[
-                item.normalized_from or item.evidence_text
-                for item in profile.capabilities
-                if item.capability == "UNRESOLVED_SKILL"
-            ],
-            missing_information=profile.missing_information,
-        )
-        message = self._deterministic_response(grounded_request)
+        with timed("ai_chat", "grounded_response_build"):
+            grounded_request = GroundedConversationRequest(
+                message=request.message,
+                language=profile.language,
+                profile=profile,
+                evidence=evidence,
+                candidate_pathways=candidates,
+                questions=questions,
+                next_step=next_step,
+                accepted_capabilities=[
+                    item.capability
+                    for item in profile.capabilities
+                    if item.capability != "UNRESOLVED_SKILL"
+                ],
+                unresolved_capabilities=[
+                    item.normalized_from or item.evidence_text
+                    for item in profile.capabilities
+                    if item.capability == "UNRESOLVED_SKILL"
+                ],
+                missing_information=profile.missing_information,
+            )
+            message = self._deterministic_response(grounded_request)
 
         try:
             # Clarifying turns are deliberately deterministic and compact. The structured
@@ -301,25 +310,26 @@ class AIService:
         except AIProviderError:
             warnings.append("Gemini grounded explanation was unavailable; deterministic response was used.")
 
-        return AIChatResponse(
-            session_id=session_id,
-            message=message,
-            language=profile.language,
-            profile_updates=profile,
-            candidate_pathways=candidates,
-            evidence=evidence,
-            questions=questions,
-            next_step=next_step,
-            current_capabilities=current_capabilities,
-            transferable_skills=transferable_skills,
-            already_demonstrated=current_capabilities,
-            needs_verification=list(dict.fromkeys(needs_verification)),
-            verified_gaps=list(dict.fromkeys(verified_gaps)),
-            provenance=[item.provenance for item in profile.capabilities] + [item.provenance for item in evidence],
-            provider=provider_name,
-            mode=mode,
-            warnings=warnings,
-        )
+        with timed("ai_chat", "response_build"):
+            return AIChatResponse(
+                session_id=session_id,
+                message=message,
+                language=profile.language,
+                profile_updates=profile,
+                candidate_pathways=candidates,
+                evidence=evidence,
+                questions=questions,
+                next_step=next_step,
+                current_capabilities=current_capabilities,
+                transferable_skills=transferable_skills,
+                already_demonstrated=current_capabilities,
+                needs_verification=list(dict.fromkeys(needs_verification)),
+                verified_gaps=list(dict.fromkeys(verified_gaps)),
+                provenance=[item.provenance for item in profile.capabilities] + [item.provenance for item in evidence],
+                provider=provider_name,
+                mode=mode,
+                warnings=warnings,
+            )
 
     def _apply_understanding(
         self,
@@ -435,33 +445,33 @@ class AIService:
     def _find_relevant_pathways(
         self, profile: LivelihoodProfile
     ) -> tuple[list[CandidatePathway], list[EvidenceRecord]]:
-        capability_names = {item.capability for item in profile.capabilities}
-        catalogue_skills = {
-            skill
-            for capability in capability_names
-            for skill in CAPABILITY_TO_CATALOGUE_SKILLS.get(capability, set())
-        }
-        skill_observations = [
-            SkillObservation(
-                raw_skill=skill,
-                normalized_skill=skill,
-                evidence_text="Beneficiary capability normalized from conversation.",
-                source_type=ProvenanceOrigin.DERIVED,
-                provenance=Provenance(origin=ProvenanceOrigin.DERIVED),
+        with timed("ai_chat", "evidence_prepare"):
+            capability_names = {item.capability for item in profile.capabilities}
+            catalogue_skills = {
+                skill
+                for capability in capability_names
+                for skill in CAPABILITY_TO_CATALOGUE_SKILLS.get(capability, set())
+            }
+            skill_observations = [
+                SkillObservation(
+                    raw_skill=skill,
+                    normalized_skill=skill,
+                    evidence_text="Beneficiary capability normalized from conversation.",
+                    source_type=ProvenanceOrigin.DERIVED,
+                    provenance=Provenance(origin=ProvenanceOrigin.DERIVED),
+                )
+                for skill in sorted(catalogue_skills)
+            ]
+            beneficiary = Beneficiary(
+                id="conversation-session",
+                preferred_language=profile.language,
+                raw_statement=profile.raw_statements[-1] if profile.raw_statements else "",
+                skills=skill_observations,
             )
-            for skill in sorted(catalogue_skills)
-        ]
-        beneficiary = Beneficiary(
-            id="conversation-session",
-            preferred_language=profile.language,
-            raw_statement=profile.raw_statements[-1] if profile.raw_statements else "",
-            skills=skill_observations,
-        )
-        candidates = recommend_pathways(beneficiary, QUALIFICATION_CATALOGUE)
-        evidence: list[EvidenceRecord] = []
-        for candidate in candidates:
-            qualification = QUALIFICATION_CATALOGUE[candidate.qualification_id]
-            evidence.append(
+        with timed("ai_chat", "pathway_evaluation"):
+            candidates = recommend_pathways(beneficiary, QUALIFICATION_CATALOGUE)
+        with timed("ai_chat", "qualification_evaluation"):
+            evidence = [
                 EvidenceRecord(
                     qualification_id=qualification.id,
                     qualification_name=qualification.display_name or qualification.name,
@@ -474,7 +484,9 @@ class AIService:
                     relationship="Related to demonstrated capability; formal scope and remaining requirements require human validation.",
                     provenance=qualification.provenance,
                 )
-            )
+                for candidate in candidates
+                for qualification in [QUALIFICATION_CATALOGUE[candidate.qualification_id]]
+            ]
         return candidates, evidence
 
     def _next_step(

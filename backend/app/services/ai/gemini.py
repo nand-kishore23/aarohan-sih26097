@@ -6,6 +6,7 @@ import os
 
 from .base import AIProvider, AIProviderConfigurationError, AIProviderUnavailableError
 from .prompts import SYSTEM_PROMPT, UNDERSTANDING_SYSTEM_PROMPT
+from ..latency import timed
 from .schemas import (
     GeminiUnderstanding,
     GroundedConversationRequest,
@@ -53,19 +54,21 @@ class GeminiProvider(AIProvider):
 
         try:
             client = genai.Client(api_key=self.api_key)
-            response = client.models.generate_content(
-                model=self.model,
-                contents=json.dumps(contents, ensure_ascii=False),
-                config=types.GenerateContentConfig(
-                    system_instruction=UNDERSTANDING_SYSTEM_PROMPT,
-                    response_mime_type="application/json",
-                    response_schema=schema_dict,
-                    temperature=0.0,
-                ),
-            )
-            parsed = getattr(response, "parsed", None)
-            raw_result = parsed if parsed is not None else json.loads(response.text or "")
-            return validate_gemini_understanding(raw_result)
+            with timed("gemini", "understanding", model=self.model):
+                response = client.models.generate_content(
+                    model=self.model,
+                    contents=json.dumps(contents, ensure_ascii=False),
+                    config=types.GenerateContentConfig(
+                        system_instruction=UNDERSTANDING_SYSTEM_PROMPT,
+                        response_mime_type="application/json",
+                        response_schema=schema_dict,
+                        temperature=0.0,
+                    ),
+                )
+            with timed("ai_chat", "structured_output_parse"):
+                parsed = getattr(response, "parsed", None)
+                raw_result = parsed if parsed is not None else json.loads(response.text or "")
+                return validate_gemini_understanding(raw_result)
         except (ValueError, TypeError) as exc:
             raise AIProviderUnavailableError("Gemini returned invalid structured understanding.") from exc
         except Exception as exc:  # Provider exceptions vary by SDK version and HTTP status.
@@ -102,22 +105,24 @@ class GeminiProvider(AIProvider):
 
         try:
             client = genai.Client(api_key=self.api_key)
-            response = client.models.generate_content(
-                model=self.model,
-                contents=json.dumps(grounding, ensure_ascii=False),
-                config=types.GenerateContentConfig(
-                    system_instruction=SYSTEM_PROMPT,
-                    temperature=0.2,
-                ),
-            )
+            with timed("gemini", "grounded_explanation", model=self.model):
+                response = client.models.generate_content(
+                    model=self.model,
+                    contents=json.dumps(grounding, ensure_ascii=False),
+                    config=types.GenerateContentConfig(
+                        system_instruction=SYSTEM_PROMPT,
+                        temperature=0.2,
+                    ),
+                )
         except Exception as exc:  # Provider exceptions vary by SDK version and HTTP status.
             raise AIProviderUnavailableError(
                 f"Gemini request failed for configured model '{self.model}': {exc}"
             ) from exc
 
-        text = getattr(response, "text", None)
-        if not text or not text.strip():
-            raise AIProviderUnavailableError(
-                f"Gemini returned no usable text for configured model '{self.model}'."
-            )
-        return text.strip()
+        with timed("ai_chat", "grounded_response_parse"):
+            text = getattr(response, "text", None)
+            if not text or not text.strip():
+                raise AIProviderUnavailableError(
+                    f"Gemini returned no usable text for configured model '{self.model}'."
+                )
+            return text.strip()

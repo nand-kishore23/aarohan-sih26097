@@ -1,6 +1,7 @@
 import uuid
+import time
 from datetime import datetime
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 
 from ..models import (
     InterviewRequest, InterviewResponse, Beneficiary,
@@ -13,12 +14,22 @@ from ..pathway_engine import recommend_pathways
 from ..services.ai.service import ai_service
 from ..services.asr.base import ASRProviderUnavailableError
 from ..services.asr.service import asr_service
+from ..services.latency import elapsed_ms, log_latency, timed
 from ..seed_data import (
     beneficiaries, QUALIFICATION_CATALOGUE, DEMO_BENEFICIARY,
     pathway_results, decisions
 )
 
 router = APIRouter()
+
+
+def parse_ai_chat_request(request: Request, payload: AIChatRequest) -> AIChatRequest:
+    """Mark completion of FastAPI body parsing and Pydantic validation."""
+
+    started_at = getattr(request.state, "ai_chat_started_at", None)
+    if started_at is not None:
+        log_latency("ai_chat", "request_parse_validation", elapsed_ms(started_at))
+    return payload
 
 @router.post("/api/demo/interview", response_model=InterviewResponse)
 def run_interview(req: InterviewRequest):
@@ -146,32 +157,38 @@ def get_ai_status():
 
 
 @router.post("/api/ai/chat", response_model=AIChatResponse)
-def chat_with_ai(req: AIChatRequest):
+def chat_with_ai(request: Request, req: AIChatRequest = Depends(parse_ai_chat_request)):
     """Run grounded conversational reasoning with session-level profile memory."""
-    response = ai_service.chat(req)
+    started_at = time.perf_counter()
+    try:
+        response = ai_service.chat(req)
 
-    # Preserve the established profile, pathway detail, and decision routes
-    # without using their legacy one-shot flow as the interview entry point.
-    beneficiary_id = f"ben-{response.session_id.removeprefix('session-')[:16]}"
-    profile = response.profile_updates
-    beneficiaries[beneficiary_id] = Beneficiary(
-        id=beneficiary_id,
-        preferred_language=profile.language,
-        current_livelihood=profile.current_livelihood or "",
-        work_experience=profile.experience_duration or "",
-        employment_preference=(
-            "self_employment" if profile.self_employment_interest else "employment"
-            if profile.wage_interest else ""
-        ),
-        data_origin=ProvenanceOrigin.DERIVED,
-        skills=profile.skills,
-        interests=profile.interests,
-        raw_statement="\n".join(profile.raw_statements),
-    )
-    for candidate in response.candidate_pathways:
-        pathway_results[candidate.id] = candidate
-    response.beneficiary_id = beneficiary_id
-    return response
+        # Preserve the established profile, pathway detail, and decision routes
+        # without using their legacy one-shot flow as the interview entry point.
+        with timed("ai_chat", "profile_persist"):
+            beneficiary_id = f"ben-{response.session_id.removeprefix('session-')[:16]}"
+            profile = response.profile_updates
+            beneficiaries[beneficiary_id] = Beneficiary(
+                id=beneficiary_id,
+                preferred_language=profile.language,
+                current_livelihood=profile.current_livelihood or "",
+                work_experience=profile.experience_duration or "",
+                employment_preference=(
+                    "self_employment" if profile.self_employment_interest else "employment"
+                    if profile.wage_interest else ""
+                ),
+                data_origin=ProvenanceOrigin.DERIVED,
+                skills=profile.skills,
+                interests=profile.interests,
+                raw_statement="\n".join(profile.raw_statements),
+            )
+            for candidate in response.candidate_pathways:
+                pathway_results[candidate.id] = candidate
+            response.beneficiary_id = beneficiary_id
+        return response
+    finally:
+        request.state.ai_chat_endpoint_finished_at = time.perf_counter()
+        log_latency("ai_chat", "endpoint_handler", elapsed_ms(started_at))
 
 
 @router.post("/api/ai/analyze", response_model=AIChatResponse)

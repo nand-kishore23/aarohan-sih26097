@@ -5,6 +5,7 @@ from .models import (
     Beneficiary, CandidatePathway, Qualification,
     Provenance, ProvenanceOrigin, VerificationStatus
 )
+from .services.latency import timed
 
 
 def evaluate_candidate(
@@ -21,11 +22,11 @@ def evaluate_candidate(
         access_constraints.append("Eligibility warning: Requires 2 years experience for 10th pass")
 
     # 2. Skill Matching
-    ben_skills = {obs.normalized_skill for obs in beneficiary.skills}
-    qual_skills = set(qual.required_skills)
-    
-    supporting_skills = list(ben_skills.intersection(qual_skills))
-    skill_gaps = list(qual_skills.difference(ben_skills))
+    with timed("ai_chat", "skill_gap_analysis"):
+        ben_skills = {obs.normalized_skill for obs in beneficiary.skills}
+        qual_skills = set(qual.required_skills)
+        supporting_skills = list(ben_skills.intersection(qual_skills))
+        skill_gaps = list(qual_skills.difference(ben_skills))
     
     # If they have 0 overlapping skills, they might not be a candidate
     # (But for demo, we might want to return it anyway to show gaps if it's the only one. 
