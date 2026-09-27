@@ -19,8 +19,8 @@ class GeminiProvider(AIProvider):
 
     def __init__(self, api_key: str | None = None, model: str | None = None):
         self.api_key = api_key if api_key is not None else os.getenv("GEMINI_API_KEY", "").strip()
-        # Gemini 2.5 Flash-Lite is configurable and currently documented with a free tier.
-        self.model = model if model is not None else os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite").strip()
+        # Gemini 3.5 Flash-Lite is configurable and currently documented with a free tier.
+        self.model = model if model is not None else os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite").strip()
 
     @property
     def configured(self) -> bool:
@@ -45,6 +45,9 @@ class GeminiProvider(AIProvider):
             "requested_language": request.language,
             "recent_beneficiary_messages": request.recent_messages[-4:],
         }
+        schema_dict = GeminiUnderstanding.model_json_schema()
+        schema_dict.pop("additionalProperties", None)
+
         try:
             client = genai.Client(api_key=self.api_key)
             response = client.models.generate_content(
@@ -53,7 +56,7 @@ class GeminiProvider(AIProvider):
                 config=types.GenerateContentConfig(
                     system_instruction=UNDERSTANDING_SYSTEM_PROMPT,
                     response_mime_type="application/json",
-                    response_schema=GeminiUnderstanding,
+                    response_schema=schema_dict,
                     temperature=0.0,
                 ),
             )
