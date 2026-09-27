@@ -16,6 +16,7 @@ from ...models import (
     LivelihoodProfile,
     Provenance,
     ProvenanceOrigin,
+    ReportedStatement,
     SkillObservation,
     VerificationStatus,
 )
@@ -24,7 +25,12 @@ from ...seed_data import QUALIFICATION_CATALOGUE
 from ...skill_engine import extract_skills
 from .base import AIProvider, AIProviderError
 from .gemini import GeminiProvider
-from .schemas import GroundedConversationRequest
+from .schemas import (
+    GeminiUnderstanding,
+    GroundedConversationRequest,
+    UnderstandingRequest,
+    validate_gemini_understanding,
+)
 
 
 CAPABILITY_PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
@@ -38,11 +44,33 @@ CAPABILITY_PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("electrical_repair", ("electrical", "wiring", "electric", "बिजली")),
 )
 
+# Only these application-owned capability IDs can reach deterministic matching.
+CAPABILITY_ALLOWLIST = frozenset(
+    {
+        "mobile_phone_repair",
+        "display_replacement",
+        "charging_fault_repair",
+        "soldering",
+        "tractor_repair",
+        "pump_repair",
+        "machine_diagnostics",
+        "electrical_repair",
+        "appliance_repair",
+        "dairy_processing",
+        "milk_testing",
+        "pasteurization",
+    }
+)
+
 CAPABILITY_TO_CATALOGUE_SKILLS = {
     "soldering": {"soldering"},
     "tractor_repair": {"tractor_repair", "mechanical_troubleshooting"},
     "pump_repair": {"pump_repair", "mechanical_troubleshooting"},
     "electrical_repair": {"electrical_repair", "wiring"},
+    "appliance_repair": {"appliance_repair"},
+    "dairy_processing": {"dairy_processing"},
+    "milk_testing": {"milk_testing"},
+    "pasteurization": {"pasteurization"},
 }
 
 TRANSFERABLE_SKILLS = {
@@ -86,7 +114,7 @@ class SessionStore:
             return resolved_id, self._sessions[resolved_id]
 
 
-def _normalized_capabilities(message: str) -> list[CapabilityObservation]:
+def _fallback_capabilities(message: str) -> list[CapabilityObservation]:
     lowered = message.casefold()
     observations: list[CapabilityObservation] = []
     for capability, patterns in CAPABILITY_PATTERNS:
@@ -104,6 +132,21 @@ def _normalized_capabilities(message: str) -> list[CapabilityObservation]:
 def _merge_unique_by_value(existing: list, additions: list, attribute: str) -> list:
     seen = {getattr(item, attribute) for item in existing}
     return [*existing, *(item for item in additions if getattr(item, attribute) not in seen)]
+
+
+def _merge_capabilities(
+    existing: list[CapabilityObservation],
+    additions: list[CapabilityObservation],
+) -> list[CapabilityObservation]:
+    seen = {(item.capability, item.normalized_from) for item in existing}
+    return [
+        *existing,
+        *(
+            item
+            for item in additions
+            if (item.capability, item.normalized_from) not in seen
+        ),
+    ]
 
 
 class AIService:
@@ -142,14 +185,60 @@ class AIService:
         profile = session.profile
         profile.language = request.language or profile.language
         profile.raw_statements.append(request.message)
-        profile.skills = _merge_unique_by_value(profile.skills, extract_skills(request.message), "normalized_skill")
-        new_capabilities = _normalized_capabilities(request.message)
-        profile.capabilities = _merge_unique_by_value(profile.capabilities, new_capabilities, "capability")
-        profile.tasks_performed = list(dict.fromkeys([*profile.tasks_performed, *(item.capability for item in new_capabilities)]))
+        profile.self_reported_statements.append(ReportedStatement(text=request.message))
         session.recent_messages = [*session.recent_messages[-3:], request.message]
 
-        questions = self._clarification_questions(profile)
-        profile.missing_information = self._missing_information(questions)
+        warnings: list[str] = []
+        provider_name = "deterministic_fallback"
+        mode = "deterministic_fallback"
+        provider: AIProvider | None = None
+        understanding: GeminiUnderstanding | None = None
+        try:
+            provider = self._provider_for_request()
+            if provider.configured:
+                understanding = validate_gemini_understanding(
+                    provider.understand(
+                        UnderstandingRequest(
+                            message=request.message,
+                            language=profile.language,
+                            recent_messages=session.recent_messages,
+                        )
+                    )
+                )
+            else:
+                warnings.append("Gemini is not configured; deterministic grounded fallback was used.")
+        except ValueError:
+            # Do not echo rejected model payloads into beneficiary-facing responses or logs.
+            warnings.append("Gemini structured understanding failed validation; deterministic fallback was used.")
+        except AIProviderError:
+            warnings.append("Gemini structured understanding was unavailable; deterministic fallback was used.")
+
+        if understanding is not None:
+            new_capabilities = self._apply_understanding(profile, understanding, request.message)
+            derived_skills = self._skills_for_capabilities(new_capabilities)
+            profile.skills = _merge_unique_by_value(profile.skills, derived_skills, "normalized_skill")
+            provider_name = provider.name if provider else provider_name
+            mode = "ai_grounded"
+        else:
+            # Existing deterministic extraction is retained only for Gemini-disabled/unavailable mode.
+            fallback_skills = extract_skills(request.message)
+            profile.skills = _merge_unique_by_value(profile.skills, fallback_skills, "normalized_skill")
+            new_capabilities = _fallback_capabilities(request.message)
+            profile.capabilities = _merge_capabilities(profile.capabilities, new_capabilities)
+            profile.tasks_performed = list(
+                dict.fromkeys([*profile.tasks_performed, *(item.capability for item in new_capabilities)])
+            )
+
+        deterministic_questions = self._clarification_questions(profile)
+        questions = self._questions_from_understanding(understanding, deterministic_questions)
+        profile.missing_information = list(
+            dict.fromkeys(
+                [
+                    *(understanding.missing_information if understanding else []),
+                    *self._missing_information(questions),
+                ]
+            )
+        )
         profile.conversation_state = "clarifying" if questions else "evidence_review"
         candidates, evidence = self._find_relevant_pathways(profile)
         session.evidence_ids = [item.qualification_id for item in evidence]
@@ -178,22 +267,27 @@ class AIService:
             candidate_pathways=candidates,
             questions=questions,
             next_step=next_step,
+            accepted_capabilities=[
+                item.capability
+                for item in profile.capabilities
+                if item.capability != "UNRESOLVED_SKILL"
+            ],
+            unresolved_capabilities=[
+                item.normalized_from or item.evidence_text
+                for item in profile.capabilities
+                if item.capability == "UNRESOLVED_SKILL"
+            ],
+            missing_information=profile.missing_information,
         )
-        warnings: list[str] = []
-        provider_name = "deterministic_fallback"
-        mode = "deterministic_fallback"
         message = self._deterministic_response(grounded_request)
 
         try:
-            provider = self._provider_for_request()
-            if not provider.configured:
-                warnings.append("Gemini is not configured; deterministic grounded fallback was used.")
-            else:
+            if provider is not None and provider.configured:
                 message = provider.generate_response(grounded_request)
                 provider_name = provider.name
                 mode = "ai_grounded"
-        except AIProviderError as exc:
-            warnings.append(str(exc))
+        except AIProviderError:
+            warnings.append("Gemini grounded explanation was unavailable; deterministic response was used.")
 
         return AIChatResponse(
             session_id=session_id,
@@ -214,6 +308,66 @@ class AIService:
             mode=mode,
             warnings=warnings,
         )
+
+    def _apply_understanding(
+        self,
+        profile: LivelihoodProfile,
+        understanding: GeminiUnderstanding,
+        raw_statement: str,
+    ) -> list[CapabilityObservation]:
+        observations: list[CapabilityObservation] = []
+        for capability in understanding.capabilities:
+            if capability in CAPABILITY_ALLOWLIST:
+                observations.append(
+                    CapabilityObservation(
+                        capability=capability,
+                        evidence_text=raw_statement,
+                        provenance=Provenance(origin=ProvenanceOrigin.DERIVED),
+                    )
+                )
+            else:
+                observations.append(
+                    CapabilityObservation(
+                        capability="UNRESOLVED_SKILL",
+                        normalized_from=capability,
+                        evidence_text=raw_statement,
+                        provenance=Provenance(origin=ProvenanceOrigin.DERIVED),
+                    )
+                )
+        profile.capabilities = _merge_capabilities(profile.capabilities, observations)
+        profile.tasks_performed = list(dict.fromkeys([*profile.tasks_performed, *understanding.reported_tasks]))
+        profile.interests = list(dict.fromkeys([*profile.interests, *understanding.interests]))
+        if understanding.current_work_description:
+            profile.current_livelihood = understanding.current_work_description
+        return observations
+
+    def _skills_for_capabilities(
+        self, observations: list[CapabilityObservation]
+    ) -> list[SkillObservation]:
+        skills = {
+            skill
+            for observation in observations
+            for skill in CAPABILITY_TO_CATALOGUE_SKILLS.get(observation.capability, set())
+        }
+        return [
+            SkillObservation(
+                raw_skill=skill,
+                normalized_skill=skill,
+                evidence_text="AAROHAN mapped an allowlisted Gemini-derived capability to a canonical skill.",
+                source_type=ProvenanceOrigin.DERIVED,
+                provenance=Provenance(origin=ProvenanceOrigin.DERIVED),
+            )
+            for skill in sorted(skills)
+        ]
+
+    def _questions_from_understanding(
+        self,
+        understanding: GeminiUnderstanding | None,
+        deterministic_questions: list[str],
+    ) -> list[str]:
+        if understanding and understanding.clarification_question:
+            return [understanding.clarification_question]
+        return deterministic_questions
 
     def _clarification_questions(self, profile: LivelihoodProfile) -> list[str]:
         capabilities = {item.capability for item in profile.capabilities}

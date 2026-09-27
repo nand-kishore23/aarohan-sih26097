@@ -35,3 +35,11 @@ This release is documentation and build-control infrastructure.
 - Preserved existing interview, pathway, community intelligence, and Evidence Brief endpoints.
 - Added AI status, phone-repair, multilingual extraction, ASR fallback, and legacy-route smoke tests.
 - Documented Render configuration, grounding rules, and prototype limitations.
+
+## Unreleased - Gemini Structured Understanding
+
+- Added Gemini-first structured livelihood understanding for /api/ai/chat.
+- Added AAROHAN capability allowlist validation and UNRESOLVED_SKILL handling.
+- Kept keyword extraction as the Gemini-disabled fallback and legacy interview path.
+- Kept pathway matching, qualification evidence, community intelligence, Evidence Brief, and human decisions deterministic.
+- Added structured-understanding, malicious-output, unresolved-capability, and fallback regression tests.

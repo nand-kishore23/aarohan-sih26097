@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from .schemas import GroundedConversationRequest
+from .schemas import GeminiUnderstanding, GroundedConversationRequest, UnderstandingRequest
 
 
 class AIProviderError(RuntimeError):
@@ -25,6 +25,10 @@ class AIProvider(ABC):
     @abstractmethod
     def configured(self) -> bool:
         """Whether the provider has the minimum safe configuration."""
+
+    def understand(self, request: UnderstandingRequest) -> GeminiUnderstanding | dict:
+        """Return conversational interpretation; providers may not provide this capability."""
+        raise AIProviderUnavailableError("Structured understanding is unavailable for this provider.")
 
     @abstractmethod
     def generate_response(self, request: GroundedConversationRequest) -> str:

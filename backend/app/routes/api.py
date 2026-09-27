@@ -26,7 +26,7 @@ def run_interview(req: InterviewRequest):
     For the prototype, if demo_mode is True, it processes the text,
     builds the demo beneficiary, extracts skills, and saves it.
     """
-    # 1. Start with the template demo beneficiary
+    # 1. Start with the template demo beneficiary (provides structural defaults)
     ben = DEMO_BENEFICIARY.model_copy(deep=True)
     
     # 2. Update with the actual text submitted
@@ -37,7 +37,18 @@ def run_interview(req: InterviewRequest):
     skills = extract_skills(req.text)
     ben.skills = skills
     
-    # 4. Save to in-memory store
+    # 4. Derive livelihood and interests from extracted skills so the
+    #    profile reflects what the user actually reported rather than
+    #    inheriting stale demo seed data.
+    from ..models import ProvenanceOrigin
+    if skills:
+        readable = [s.normalized_skill.replace("_", " ") for s in skills]
+        ben.current_livelihood = ", ".join(dict.fromkeys(readable))
+        ben.interests = list(dict.fromkeys(readable))
+        ben.work_experience = ""  # clear demo boilerplate
+        ben.data_origin = ProvenanceOrigin.SELF_REPORTED
+    
+    # 5. Save to in-memory store
     beneficiaries[ben.id] = ben
     
     return InterviewResponse(

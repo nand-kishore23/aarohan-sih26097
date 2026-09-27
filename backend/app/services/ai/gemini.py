@@ -5,8 +5,13 @@ import json
 import os
 
 from .base import AIProvider, AIProviderConfigurationError, AIProviderUnavailableError
-from .prompts import SYSTEM_PROMPT
-from .schemas import GroundedConversationRequest
+from .prompts import SYSTEM_PROMPT, UNDERSTANDING_SYSTEM_PROMPT
+from .schemas import (
+    GeminiUnderstanding,
+    GroundedConversationRequest,
+    UnderstandingRequest,
+    validate_gemini_understanding,
+)
 
 
 class GeminiProvider(AIProvider):
@@ -20,6 +25,47 @@ class GeminiProvider(AIProvider):
     @property
     def configured(self) -> bool:
         return bool(self.api_key and self.model)
+
+    def understand(self, request: UnderstandingRequest) -> GeminiUnderstanding:
+        if not self.api_key:
+            raise AIProviderConfigurationError("GEMINI_API_KEY is not configured.")
+        if not self.model:
+            raise AIProviderConfigurationError("GEMINI_MODEL is not configured.")
+
+        try:
+            from google import genai
+            from google.genai import types
+        except ImportError as exc:
+            raise AIProviderConfigurationError(
+                "google-genai is not installed; install backend requirements before enabling Gemini."
+            ) from exc
+
+        contents = {
+            "beneficiary_message": request.message,
+            "requested_language": request.language,
+            "recent_beneficiary_messages": request.recent_messages[-4:],
+        }
+        try:
+            client = genai.Client(api_key=self.api_key)
+            response = client.models.generate_content(
+                model=self.model,
+                contents=json.dumps(contents, ensure_ascii=False),
+                config=types.GenerateContentConfig(
+                    system_instruction=UNDERSTANDING_SYSTEM_PROMPT,
+                    response_mime_type="application/json",
+                    response_schema=GeminiUnderstanding,
+                    temperature=0.0,
+                ),
+            )
+            parsed = getattr(response, "parsed", None)
+            raw_result = parsed if parsed is not None else json.loads(response.text or "")
+            return validate_gemini_understanding(raw_result)
+        except (ValueError, TypeError) as exc:
+            raise AIProviderUnavailableError("Gemini returned invalid structured understanding.") from exc
+        except Exception as exc:  # Provider exceptions vary by SDK version and HTTP status.
+            raise AIProviderUnavailableError(
+                f"Gemini understanding request failed for configured model '{self.model}': {exc}"
+            ) from exc
 
     def generate_response(self, request: GroundedConversationRequest) -> str:
         if not self.api_key:
@@ -39,6 +85,9 @@ class GeminiProvider(AIProvider):
             "language": request.language,
             "beneficiary_message": request.message,
             "profile": request.profile.model_dump(mode="json"),
+            "accepted_capabilities": request.accepted_capabilities,
+            "unresolved_capabilities": request.unresolved_capabilities,
+            "missing_information": request.missing_information,
             "verified_evidence": [item.model_dump(mode="json") for item in request.evidence],
             "candidate_pathways": [item.model_dump(mode="json") for item in request.candidate_pathways],
             "clarification_questions": request.questions,

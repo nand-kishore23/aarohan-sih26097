@@ -271,8 +271,18 @@ class CapabilityObservation(BaseModel):
 
     capability: str
     evidence_text: str
+    normalized_from: Optional[str] = None
     provenance: Provenance = Field(
         default_factory=lambda: Provenance(origin=ProvenanceOrigin.DERIVED)
+    )
+
+
+class ReportedStatement(BaseModel):
+    """Verbatim beneficiary input, kept separate from derived interpretation."""
+
+    text: str
+    provenance: Provenance = Field(
+        default_factory=lambda: Provenance(origin=ProvenanceOrigin.SELF_REPORTED)
     )
 
 
@@ -281,6 +291,7 @@ class LivelihoodProfile(BaseModel):
 
     language: str = "hi"
     raw_statements: list[str] = []
+    self_reported_statements: list[ReportedStatement] = []
     current_livelihood: Optional[str] = None
     informal_experience: list[str] = []
     skills: list[SkillObservation] = []
