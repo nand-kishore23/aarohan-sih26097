@@ -20,7 +20,10 @@ class GeminiProvider(AIProvider):
     def __init__(self, api_key: str | None = None, model: str | None = None):
         self.api_key = api_key if api_key is not None else os.getenv("GEMINI_API_KEY", "").strip()
         # Gemini 3.5 Flash-Lite is configurable and currently documented with a free tier.
-        self.model = model if model is not None else os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite").strip()
+        env_model = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite").strip()
+        if env_model == "gemini-2.5-flash-lite":
+            env_model = "gemini-3.5-flash-lite"
+        self.model = model if model is not None else env_model
 
     @property
     def configured(self) -> bool:
