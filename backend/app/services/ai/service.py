@@ -207,11 +207,11 @@ class AIService:
                 )
             else:
                 warnings.append("Gemini is not configured; deterministic grounded fallback was used.")
-        except ValueError:
+        except ValueError as exc:
             # Do not echo rejected model payloads into beneficiary-facing responses or logs.
-            warnings.append("Gemini structured understanding failed validation; deterministic fallback was used.")
-        except AIProviderError:
-            warnings.append("Gemini structured understanding was unavailable; deterministic fallback was used.")
+            warnings.append(f"Gemini structured understanding failed validation: {exc}")
+        except AIProviderError as exc:
+            warnings.append(f"Gemini structured understanding was unavailable: {exc}")
 
         if understanding is not None:
             new_capabilities = self._apply_understanding(profile, understanding, request.message)
@@ -286,8 +286,8 @@ class AIService:
                 message = provider.generate_response(grounded_request)
                 provider_name = provider.name
                 mode = "ai_grounded"
-        except AIProviderError:
-            warnings.append("Gemini grounded explanation was unavailable; deterministic response was used.")
+        except AIProviderError as exc:
+            warnings.append(f"Gemini grounded explanation was unavailable: {exc}")
 
         return AIChatResponse(
             session_id=session_id,
