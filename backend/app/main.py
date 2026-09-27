@@ -14,11 +14,13 @@ configured_origins = [
     if origin.strip()
 ]
 allowed_origins = list(dict.fromkeys([*local_origins, *configured_origins]))
+vercel_aarohan_origin_regex = r"^https://aarohan-sih26097(?:-[a-z0-9-]+)?\.vercel\.app$"
 
 # Allow frontend to access the API
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
+    allow_origin_regex=vercel_aarohan_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
