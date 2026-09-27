@@ -39,7 +39,7 @@ def test_ai_status_reports_the_provider_model_after_legacy_model_migration(monke
     assert response.json()["ai_model"] == "gemini-3.5-flash-lite"
 
 
-def test_provider_abstraction_can_return_a_grounded_response():
+def test_provider_abstraction_generates_a_grounded_response_after_clarification():
     class StubProvider(AIProvider):
         name = "stub"
 
@@ -47,18 +47,68 @@ def test_provider_abstraction_can_return_a_grounded_response():
         def configured(self):
             return True
 
+        def understand(self, request):
+            return {
+                "language": "hi",
+                "capabilities": [
+                    "mobile_phone_repair",
+                    "display_replacement",
+                    "charging_fault_repair",
+                    "soldering",
+                ],
+            }
+
         def generate_response(self, request):
-            assert request.questions
+            assert not request.questions
             assert request.profile.capabilities[0].capability == "mobile_phone_repair"
             return "Grounded provider response"
 
-    response = AIService(provider=StubProvider(), sessions=SessionStore()).chat(
-        AIChatRequest(message="Mujhe phone repair aata hai", language="hi")
+    service = AIService(provider=StubProvider(), sessions=SessionStore())
+    first = service.chat(AIChatRequest(message="Mujhe phone repair aata hai", language="hi"))
+    second = service.chat(
+        AIChatRequest(session_id=first.session_id, message="Do saal se kar raha hoon.", language="hi")
+    )
+    response = service.chat(
+        AIChatRequest(session_id=first.session_id, message="Apna kaam karna hai.", language="hi")
     )
 
     assert response.provider == "stub"
     assert response.mode == "ai_grounded"
     assert response.message == "Grounded provider response"
+
+
+def test_clarifying_message_is_short_and_hides_internal_evidence_terms():
+    response = AIService(sessions=SessionStore()).chat(
+        AIChatRequest(message="Mujhe phone repair aata hai", language="hi")
+    )
+
+    assert response.questions[0] in response.message
+    assert response.message.count(response.questions[0]) == 1
+    for term in ("QP", "NSQF", "NOS", "evidence", "validation", "OPPORTUNITY"):
+        assert term.lower() not in response.message.lower()
+
+
+def test_known_experience_and_work_preference_do_not_trigger_duplicate_questions():
+    message = "Main dairy mein do saal se kaam karke apna kaam shuru karna chahta hoon."
+    provider = StructuredUnderstandingProvider(
+        {
+            message: {
+                "language": "hi",
+                "reported_tasks": ["milk testing"],
+                "capabilities": ["milk_testing"],
+                "experience_duration": "2 years",
+                "work_preference": "self employment",
+            }
+        }
+    )
+
+    response = AIService(provider=provider, sessions=SessionStore()).chat(
+        AIChatRequest(message=message, language="hi")
+    )
+
+    assert response.profile_updates.experience_duration == "2 years"
+    assert response.profile_updates.work_preference == "self employment"
+    assert response.questions == []
 
 
 def test_phone_repair_conversation_updates_profile_and_never_invents_pathway():

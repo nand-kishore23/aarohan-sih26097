@@ -290,7 +290,11 @@ class AIService:
         message = self._deterministic_response(grounded_request)
 
         try:
-            if provider is not None and provider.configured:
+            # Clarifying turns are deliberately deterministic and compact. The structured
+            # understanding provider supplies the one question; grounded explanation is
+            # reserved for the completed interview so internal evidence language cannot
+            # leak into the conversation.
+            if not questions and provider is not None and provider.configured:
                 message = provider.generate_response(grounded_request)
                 provider_name = provider.name
                 mode = "ai_grounded"
@@ -353,6 +357,8 @@ class AIService:
             profile.informal_experience = list(
                 dict.fromkeys([*profile.informal_experience, understanding.learning_source])
             )
+        if understanding.work_preference:
+            profile.work_preference = understanding.work_preference
         return observations
 
     def _skills_for_capabilities(
@@ -402,12 +408,12 @@ class AIService:
         # Deterministic fallback relies on turn counts since it can't populate fields.
         resolved = {c for c in capabilities if c != "UNRESOLVED_SKILL"}
         if resolved:
-            if len(profile.raw_statements) == 1:
+            if len(profile.raw_statements) == 1 and not profile.experience_duration:
                 return [
                     "Aap yeh kaam kitne samay se kar rahe hain?"
                     if hindi else "How long have you been doing this work?"
                 ]
-            if len(profile.raw_statements) == 2:
+            if len(profile.raw_statements) == 2 and not profile.work_preference:
                 return [
                     "Aap naukri dhundh rahe hain ya apna kaam shuru karna chahte hain?"
                     if hindi else "Are you looking for employment or self-employment?"
@@ -486,22 +492,17 @@ class AIService:
 
     def _deterministic_response(self, request: GroundedConversationRequest) -> str:
         hindi = request.language.lower().startswith("hi")
-        capabilities = [item.capability.replace("_", " ") for item in request.profile.capabilities]
         if hindi:
-            intro = "Samajh gaya. Aapke bataye hue practical kaam mein " + (", ".join(capabilities) if capabilities else "abhi koi specific capability clear nahi hui") + " shamil hain."
             if request.questions:
-                return f"{intro} {request.questions[0]}"
+                return f"Samajh gaya. {request.questions[0]}"
             if request.candidate_pathways:
-                names = ", ".join(candidate.pathway_name for candidate in request.candidate_pathways)
-                return f"{intro} Available source-backed prototype evidence mein {names} related hai. Yeh formal phone-repair qualification ka claim nahi hai; remaining requirements aur eligibility ko human validation se verify karna hoga. {request.next_step}"
-            return f"{intro} Mobile phone repair ke liye current verified prototype catalogue mein koi supported formal pathway evidence nahi mila. Isliye main QP, NSQF level, certificate, ya employment claim nahi kar raha. {request.next_step}"
-        intro = "I understand that your demonstrated practical capabilities include " + (", ".join(capabilities) if capabilities else "no specific capability yet") + "."
+                return "Dhanyavaad. Aapki jaankari ke aadhaar par neeche kuch candidate pathways diye gaye hain."
+            return "Dhanyavaad. Aapki jaankari record kar li gayi hai. Neeche saaransh dekhein."
         if request.questions:
-            return f"{intro} {request.questions[0]}"
+            return f"I understand. {request.questions[0]}"
         if request.candidate_pathways:
-            names = ", ".join(candidate.pathway_name for candidate in request.candidate_pathways)
-            return f"{intro} The available source-backed prototype evidence identifies {names} as related. This is not a claim of a formal phone-repair qualification; eligibility and remaining requirements need human validation. {request.next_step}"
-        return f"{intro} The current verified prototype catalogue has no supported formal pathway evidence for mobile phone repair, so I cannot claim a QP, NSQF level, certificate, or employment outcome. {request.next_step}"
+            return "Thank you. Based on what you shared, some candidate pathways are shown below."
+        return "Thank you. Your details have been recorded. See the summary below."
 
 
 ai_service = AIService()

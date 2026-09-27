@@ -15,6 +15,14 @@ type ChatResponse = {
     skill_gaps: string[];
   }>;
   transferable_skills: string[];
+  profile_updates: {
+    tasks_performed: string[];
+    capabilities: Array<{ capability: string }>;
+    experience_duration?: string | null;
+    informal_experience: string[];
+    certifications: string[];
+    current_livelihood?: string | null;
+  };
 };
 
 type ConversationTurn = {
@@ -22,6 +30,35 @@ type ConversationTurn = {
   text: string;
   response?: ChatResponse;
 };
+
+function InterviewSummary({ response }: { response: ChatResponse }) {
+  const profile = response.profile_updates;
+  const skills = profile.tasks_performed.length > 0
+    ? profile.tasks_performed
+    : profile.capabilities
+      .filter((item) => item.capability !== 'UNRESOLVED_SKILL')
+      .map((item) => item.capability.replace(/_/g, ' '));
+  const field = (label: string, value: string) => (
+    <div>
+      <dt className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">{label}</dt>
+      <dd className="mt-1 text-sm text-slate-200">{value}</dd>
+    </div>
+  );
+
+  return (
+    <section className="border-t border-[#19212C] pt-3" aria-label="Interview summary">
+      <h3 className="text-xs font-semibold text-slate-200">आपकी जानकारी का सारांश</h3>
+      <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+        {field('क्षेत्र', profile.current_livelihood || skills[0] || 'अभी जानकारी नहीं मिली')}
+        {field('कौशल', skills.length > 0 ? skills.join(' • ') : 'अभी जानकारी नहीं मिली')}
+        {field('अनुभव', profile.experience_duration || 'अभी जानकारी नहीं मिली')}
+        {field('प्रशिक्षण', profile.certifications.length > 0 ? 'बताया गया प्रमाणपत्र' : profile.informal_experience.length > 0 ? 'अनौपचारिक रूप से सीखा' : 'अभी पुष्टि आवश्यक')}
+        {field('अगला कदम', response.candidate_pathways.length > 0 ? 'कौशल और अवसर की जाँच' : 'अगली बातचीत में जानकारी पूरी करें')}
+      </dl>
+      <p className="mt-3 text-xs text-slate-500">अभी कोई अंतिम निर्णय नहीं लिया गया है। आगे सत्यापन आवश्यक है।</p>
+    </section>
+  );
+}
 
 export default function InterviewPage() {
   const [text, setText] = useState('');
@@ -139,26 +176,16 @@ export default function InterviewPage() {
               <p>{turn.text}</p>
               {turn.response && (
                 <div className="mt-4 space-y-3">
-                  {turn.response.questions[0] && (
-                    <p className="border-l-2 border-[#00A8FF] pl-3 text-slate-200">{turn.response.questions[0]}</p>
-                  )}
-                  {turn.response.transferable_skills.length > 0 && (
-                    <p className="text-xs text-slate-400">Transferable skills: {turn.response.transferable_skills.join(', ').replace(/_/g, ' ')}</p>
-                  )}
+                  {turn.response.questions.length === 0 && <InterviewSummary response={turn.response} />}
                   {turn.response.candidate_pathways.length > 0 && (
                     <div className="space-y-2 border-t border-[#19212C] pt-3">
                       <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Candidate pathways</p>
                       {turn.response.candidate_pathways.map((pathway) => (
                         <Link key={pathway.id} href={`/pathways/${turn.response?.beneficiary_id}/${pathway.id}`} className="block rounded-md border border-[#19212C] bg-[#111720] p-3 text-slate-200 hover:border-[#00A8FF]">
                           <span className="font-medium">{pathway.pathway_name}</span>
-                          <span className="mt-1 block text-xs text-slate-400">{pathway.supporting_skills.length} demonstrated skills, {pathway.skill_gaps.length} potential gaps</span>
                         </Link>
                       ))}
-                      <p className="text-xs text-slate-500">OPPORTUNITY EVIDENCE INSUFFICIENT. Field validation required.</p>
                     </div>
-                  )}
-                  {turn.response.candidate_pathways.length === 0 && turn.response.questions.length === 0 && (
-                    <p className="text-xs text-slate-500">OPPORTUNITY EVIDENCE INSUFFICIENT. Field validation required.</p>
                   )}
                 </div>
               )}

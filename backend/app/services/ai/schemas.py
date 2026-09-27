@@ -48,6 +48,7 @@ class GeminiUnderstanding(BaseModel):
     current_work_description: str | None = Field(default=None, max_length=400)
     experience_duration: str | None = Field(default=None, max_length=100)
     learning_source: str | None = Field(default=None, max_length=200)
+    work_preference: str | None = Field(default=None, max_length=100)
     missing_information: list[str] = Field(default_factory=list, max_length=8)
     clarification_question: str | None = Field(default=None, max_length=300)
 
