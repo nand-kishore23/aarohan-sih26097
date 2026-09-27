@@ -30,6 +30,15 @@ def test_ai_status_is_safe_and_reports_deterministic_fallback():
     assert "GEMINI_API_KEY" not in str(payload)
 
 
+def test_ai_status_reports_the_provider_model_after_legacy_model_migration(monkeypatch):
+    monkeypatch.setenv("GEMINI_MODEL", "gemini-2.5-flash-lite")
+
+    response = client.get("/api/ai/status")
+
+    assert response.status_code == 200
+    assert response.json()["ai_model"] == "gemini-3.5-flash-lite"
+
+
 def test_provider_abstraction_can_return_a_grounded_response():
     class StubProvider(AIProvider):
         name = "stub"

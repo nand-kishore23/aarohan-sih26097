@@ -166,14 +166,13 @@ class AIService:
 
     def status(self) -> dict[str, object]:
         configured_provider = os.getenv("AI_PROVIDER", "gemini").strip().lower()
-        model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite").strip()
-        gemini = GeminiProvider(model=model)
+        gemini = GeminiProvider()
         from ..asr.service import asr_service
 
         return {
             "ai_provider": configured_provider,
             "ai_configured": configured_provider == "gemini" and gemini.configured,
-            "ai_model": model or None,
+            "ai_model": gemini.model or None,
             "asr_provider": asr_service.provider_name,
             "asr_configured": asr_service.configured,
             "evidence_engine": "available",
