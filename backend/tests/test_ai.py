@@ -110,6 +110,43 @@ def test_hindi_hinglish_and_english_capability_extraction(statement, capability)
     assert capability in capabilities
 
 
+def test_ai_chat_persists_the_conversation_profile_and_grounded_candidates_for_existing_views():
+    first = client.post("/api/ai/chat", json={"message": "Mujhe phone repair aata hai.", "language": "hi"})
+    assert first.status_code == 200
+    session_id = first.json()["session_id"]
+
+    second = client.post(
+        "/api/ai/chat",
+        json={
+            "session_id": session_id,
+            "message": "Display aur charging ka repair karta hoon.",
+            "language": "hi",
+        },
+    )
+    assert second.status_code == 200
+    assert second.json()["candidate_pathways"] == []
+
+    third = client.post(
+        "/api/ai/chat",
+        json={
+            "session_id": session_id,
+            "message": "Soldering bhi kar leta hoon.",
+            "language": "hi",
+        },
+    )
+    payload = third.json()
+    assert third.status_code == 200
+    assert payload["beneficiary_id"]
+    assert payload["candidate_pathways"]
+
+    profile = client.get(f"/api/beneficiaries/{payload['beneficiary_id']}")
+    assert profile.status_code == 200
+    assert "Mujhe phone repair aata hai." in profile.json()["raw_statement"]
+
+    detail = client.get(f"/api/pathways/{payload['candidate_pathways'][0]['id']}")
+    assert detail.status_code == 200
+
+
 def test_voice_endpoint_relays_browser_transcript_without_fake_asr():
     response = client.post(
         "/api/voice/transcribe",

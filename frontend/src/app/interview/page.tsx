@@ -1,14 +1,35 @@
 "use client";
 
 import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+
+type ChatResponse = {
+  session_id: string;
+  beneficiary_id: string;
+  message: string;
+  questions: string[];
+  candidate_pathways: Array<{
+    id: string;
+    pathway_name: string;
+    supporting_skills: string[];
+    skill_gaps: string[];
+  }>;
+  transferable_skills: string[];
+};
+
+type ConversationTurn = {
+  role: 'beneficiary' | 'assistant';
+  text: string;
+  response?: ChatResponse;
+};
 
 export default function InterviewPage() {
-  const router = useRouter();
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [isListening, setIsListening] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [conversation, setConversation] = useState<ConversationTurn[]>([]);
 
   const demoPresets = [
     "Main tractor aur pump repair karta hoon, papa ke saath kaam karta hoon. Chhoti-moti machine repair kar leta hoon, lekin certificate nahi hai.",
@@ -63,34 +84,30 @@ export default function InterviewPage() {
     setError('');
     
     try {
-      const res = await fetch((process.env.NEXT_PUBLIC_API_URL || '') + '/api/demo/interview', {
+      const beneficiaryMessage = text.trim();
+      const res = await fetch((process.env.NEXT_PUBLIC_API_URL || '') + '/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, demo_mode: true })
+        body: JSON.stringify({
+          message: beneficiaryMessage,
+          language: 'hi',
+          ...(sessionId ? { session_id: sessionId } : {})
+        })
       });
       
       if (!res.ok) throw new Error('Failed to process interview');
       
-      const data = await res.json();
-      
-      // Update local history
-      try {
-        const stored = localStorage.getItem('aarohan_sessions');
-        let sessions = stored ? JSON.parse(stored) : [];
-        const newTitle = text.slice(0, 30) + (text.length > 30 ? '...' : '');
-        sessions.unshift({
-          id: data.interview_id || Date.now().toString(),
-          title: newTitle || 'Empty Session',
-          timestamp: Date.now(),
-          profileId: data.beneficiary.id
-        });
-        localStorage.setItem('aarohan_sessions', JSON.stringify(sessions.slice(0, 20))); // Keep last 20
-        window.dispatchEvent(new Event('aarohan_session_update'));
-      } catch(e) {}
-
-      router.push(`/profile/${data.beneficiary.id}`);
+      const data: ChatResponse = await res.json();
+      setSessionId(data.session_id);
+      setConversation((current) => [
+        ...current,
+        { role: 'beneficiary', text: beneficiaryMessage },
+        { role: 'assistant', text: data.message, response: data }
+      ]);
+      setText('');
     } catch (err: any) {
       setError(err.message || 'Something went wrong');
+    } finally {
       setLoading(false);
     }
   };
@@ -113,8 +130,43 @@ export default function InterviewPage() {
           </div>
         </div>
 
-        {/* Demo Presets (for prototype ease) */}
-        <div className="flex gap-4">
+        {conversation.map((turn, index) => (
+          <div key={index} className={`flex gap-4 ${turn.role === 'beneficiary' ? 'justify-end' : ''}`}>
+            {turn.role === 'assistant' && (
+              <div className="w-8 h-8 rounded-full bg-[#111720] border border-[#19212C] flex items-center justify-center flex-shrink-0 text-[#00A8FF] font-bold text-xs">A</div>
+            )}
+            <div className={`max-w-xl rounded-md border p-4 text-sm leading-relaxed ${turn.role === 'beneficiary' ? 'bg-[#151B24] border-[#2D3748] text-slate-200' : 'bg-[#0B0F14] border-[#19212C] text-slate-300'}`}>
+              <p>{turn.text}</p>
+              {turn.response && (
+                <div className="mt-4 space-y-3">
+                  {turn.response.questions[0] && (
+                    <p className="border-l-2 border-[#00A8FF] pl-3 text-slate-200">{turn.response.questions[0]}</p>
+                  )}
+                  {turn.response.transferable_skills.length > 0 && (
+                    <p className="text-xs text-slate-400">Transferable skills: {turn.response.transferable_skills.join(', ').replace(/_/g, ' ')}</p>
+                  )}
+                  {turn.response.candidate_pathways.length > 0 && (
+                    <div className="space-y-2 border-t border-[#19212C] pt-3">
+                      <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Candidate pathways</p>
+                      {turn.response.candidate_pathways.map((pathway) => (
+                        <Link key={pathway.id} href={`/pathways/${turn.response?.beneficiary_id}/${pathway.id}`} className="block rounded-md border border-[#19212C] bg-[#111720] p-3 text-slate-200 hover:border-[#00A8FF]">
+                          <span className="font-medium">{pathway.pathway_name}</span>
+                          <span className="mt-1 block text-xs text-slate-400">{pathway.supporting_skills.length} demonstrated skills, {pathway.skill_gaps.length} potential gaps</span>
+                        </Link>
+                      ))}
+                      <p className="text-xs text-slate-500">OPPORTUNITY EVIDENCE INSUFFICIENT. Field validation required.</p>
+                    </div>
+                  )}
+                  {turn.response.candidate_pathways.length === 0 && turn.response.questions.length === 0 && (
+                    <p className="text-xs text-slate-500">OPPORTUNITY EVIDENCE INSUFFICIENT. Field validation required.</p>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+
+        {conversation.length === 0 && <div className="flex gap-4">
           <div className="w-8 h-8 flex-shrink-0"></div>
           <div className="flex flex-col gap-2 w-full max-w-xl">
             {demoPresets.map((preset, i) => (
@@ -128,7 +180,7 @@ export default function InterviewPage() {
               </button>
             ))}
           </div>
-        </div>
+        </div>}
       </div>
 
       {/* Input Area */}
@@ -162,7 +214,7 @@ export default function InterviewPage() {
                 disabled={loading || isListening || !text.trim()}
                 className="bg-[#00A8FF] hover:bg-[#0090DF] disabled:bg-[#151B24] disabled:text-slate-500 text-[#07090D] font-semibold py-1.5 px-4 rounded-md text-sm transition-colors flex justify-center items-center"
               >
-                {loading ? 'Processing...' : 'Extract Evidence'}
+                {loading ? 'Thinking...' : 'Send'}
               </button>
             </div>
           </div>

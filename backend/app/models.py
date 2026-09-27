@@ -340,6 +340,7 @@ class AIChatResponse(BaseModel):
     message: str
     language: str
     profile_updates: LivelihoodProfile
+    beneficiary_id: str | None = None
     candidate_pathways: list[CandidatePathway] = []
     evidence: list[EvidenceRecord] = []
     questions: list[str] = []

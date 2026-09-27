@@ -1,0 +1,10 @@
+{
+  "name": "aarohan-sih26097",
+  "private": true,
+  "workspaces": [
+    "frontend"
+  ],
+  "scripts": {
+    "vercel-build": "npm run build --workspace=frontend"
+  }
+}

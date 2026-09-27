@@ -5,7 +5,8 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from ..models import (
     InterviewRequest, InterviewResponse, Beneficiary,
     PathwayRecommendRequest, PathwayRecommendResponse,
-    PathwayDecisionRequest, PathwayDecisionResponse, AIChatRequest, AIChatResponse
+    PathwayDecisionRequest, PathwayDecisionResponse, AIChatRequest, AIChatResponse,
+    ProvenanceOrigin,
 )
 from ..skill_engine import extract_skills
 from ..pathway_engine import recommend_pathways
@@ -147,7 +148,30 @@ def get_ai_status():
 @router.post("/api/ai/chat", response_model=AIChatResponse)
 def chat_with_ai(req: AIChatRequest):
     """Run grounded conversational reasoning with session-level profile memory."""
-    return ai_service.chat(req)
+    response = ai_service.chat(req)
+
+    # Preserve the established profile, pathway detail, and decision routes
+    # without using their legacy one-shot flow as the interview entry point.
+    beneficiary_id = f"ben-{response.session_id.removeprefix('session-')[:16]}"
+    profile = response.profile_updates
+    beneficiaries[beneficiary_id] = Beneficiary(
+        id=beneficiary_id,
+        preferred_language=profile.language,
+        current_livelihood=profile.current_livelihood or "",
+        work_experience=profile.experience_duration or "",
+        employment_preference=(
+            "self_employment" if profile.self_employment_interest else "employment"
+            if profile.wage_interest else ""
+        ),
+        data_origin=ProvenanceOrigin.DERIVED,
+        skills=profile.skills,
+        interests=profile.interests,
+        raw_statement="\n".join(profile.raw_statements),
+    )
+    for candidate in response.candidate_pathways:
+        pathway_results[candidate.id] = candidate
+    response.beneficiary_id = beneficiary_id
+    return response
 
 
 @router.post("/api/ai/analyze", response_model=AIChatResponse)
