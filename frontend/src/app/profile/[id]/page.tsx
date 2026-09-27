@@ -47,7 +47,7 @@ export default function ProfilePage() {
   return (
     <div className="max-w-4xl mx-auto py-4">
       
-      <div className="flex justify-between items-end mb-8 border-b border-[#19212C] pb-6">
+      <div className="mb-8 flex flex-col gap-4 border-b border-[#19212C] pb-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white mb-2">Beneficiary Profile</h1>
           <ProvenanceBadge origin={ben.data_origin} />
@@ -66,7 +66,7 @@ export default function ProfilePage() {
         {/* Basic Details */}
         <div className="bg-[#0B0F14] p-6 rounded-xl border border-[#19212C]">
           <h2 className="text-sm font-semibold text-slate-300 mb-4 uppercase tracking-wider">Basic Details</h2>
-          <dl className="grid grid-cols-2 gap-y-4 text-sm">
+          <dl className="grid grid-cols-[minmax(0,auto)_minmax(0,1fr)] gap-x-4 gap-y-4 text-sm">
             <dt className="text-slate-500">Name</dt><dd className="font-medium text-slate-200">{ben.name}</dd>
             <dt className="text-slate-500">District</dt><dd className="font-medium text-slate-200">{ben.district}</dd>
             <dt className="text-slate-500">Education</dt><dd className="font-medium text-slate-200">{ben.education}</dd>
@@ -78,7 +78,7 @@ export default function ProfilePage() {
         {/* Raw Evidence */}
         <div className="bg-[#0B0F14] p-6 rounded-xl border border-[#19212C] flex flex-col">
           <h2 className="text-sm font-semibold text-slate-300 mb-4 uppercase tracking-wider">Raw Evidence</h2>
-          <div className="flex-1 bg-[#07090D] p-4 rounded-md text-sm text-slate-400 italic border border-[#151B24] leading-relaxed">
+          <div className="flex-1 break-words bg-[#07090D] p-4 rounded-md text-sm text-slate-400 italic border border-[#151B24] leading-relaxed">
             "{ben.raw_statement}"
           </div>
           <div className="mt-4">
@@ -97,8 +97,8 @@ export default function ProfilePage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {ben.skills.map((skill: any, i: number) => (
               <div key={i} className="p-4 border border-[#19212C] rounded-lg bg-[#111720]">
-                <div className="flex justify-between items-start mb-3">
-                  <span className="font-semibold text-white text-sm">{skill.normalized_skill.replace(/_/g, ' ')}</span>
+                <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <span className="break-words font-semibold text-white text-sm">{skill.normalized_skill.replace(/_/g, ' ')}</span>
                   <ProvenanceBadge origin={skill.provenance.origin} />
                 </div>
                 <p className="text-xs text-slate-400 leading-relaxed">

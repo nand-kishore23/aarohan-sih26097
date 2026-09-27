@@ -31,7 +31,7 @@ export default function EvidenceBriefPage() {
         Back to Dashboard
       </Link>
 
-      <div className="bg-[#0B0F14] border border-[#19212C] shadow-sm p-8 md:p-12 rounded-lg">
+      <div className="rounded-lg border border-[#19212C] bg-[#0B0F14] p-5 shadow-sm sm:p-8 md:p-12">
         <div className="text-center mb-12 border-b border-[#19212C] pb-8">
           <h1 className="text-2xl font-bold text-white mb-4 uppercase tracking-widest">Livelihood Evidence Brief</h1>
           <div className="inline-block bg-[#111720] border border-[#19212C] rounded-md px-4 py-2">
@@ -44,7 +44,7 @@ export default function EvidenceBriefPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-6 mb-10 text-sm border-b border-[#19212C] pb-8">
+        <div className="mb-10 grid gap-6 border-b border-[#19212C] pb-8 text-sm sm:grid-cols-2">
           <div>
             <span className="font-semibold text-slate-500 uppercase tracking-widest text-[10px] block mb-1">District / Area</span>
             <span className="font-medium text-slate-200 text-base">{data.district}</span>

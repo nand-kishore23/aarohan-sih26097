@@ -84,13 +84,13 @@ export default function VoiceDiagnosticPage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto py-10 px-4 font-sans">
+    <div className="mx-auto max-w-2xl px-1 py-6 font-sans sm:px-4 sm:py-10">
       <h1 className="text-3xl font-bold text-slate-900 mb-6 border-b pb-4">AAROHAN Voice Diagnostic</h1>
       
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 mb-6 space-y-6">
+      <div className="mb-6 space-y-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6">
         
         {/* Support Status */}
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <span className="font-semibold text-slate-700">Browser API Status:</span>
           {isSupported === null ? (
             <span className="text-slate-500">Checking...</span>
@@ -102,7 +102,7 @@ export default function VoiceDiagnosticPage() {
         </div>
 
         {/* Microphone State */}
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <span className="font-semibold text-slate-700">Microphone State:</span>
           {isListening ? (
             <span className="flex items-center gap-2 text-red-600 font-bold animate-pulse">
@@ -114,7 +114,7 @@ export default function VoiceDiagnosticPage() {
         </div>
 
         {/* Controls */}
-        <div className="flex gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row">
           <button 
             onClick={startVoiceTest}
             disabled={!isSupported || isListening}
@@ -131,7 +131,7 @@ export default function VoiceDiagnosticPage() {
           </button>
           <button 
             onClick={useSampleTranscript}
-            className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-medium py-2 px-4 rounded transition-colors ml-auto"
+            className="bg-slate-200 hover:bg-slate-300 text-slate-800 font-medium py-2 px-4 rounded transition-colors sm:ml-auto"
           >
             Use Sample Transcript
           </button>

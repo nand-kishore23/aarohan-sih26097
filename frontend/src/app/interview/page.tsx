@@ -41,7 +41,7 @@ function InterviewSummary({ response }: { response: ChatResponse }) {
   const field = (label: string, value: string) => (
     <div>
       <dt className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">{label}</dt>
-      <dd className="mt-1 text-sm text-slate-200">{value}</dd>
+      <dd className="mt-1 break-words text-sm text-slate-200">{value}</dd>
     </div>
   );
 
@@ -150,15 +150,15 @@ export default function InterviewPage() {
   };
 
   return (
-    <div className="flex flex-col h-full max-w-3xl mx-auto py-4">
+    <div className="mx-auto flex h-full min-h-0 w-full max-w-3xl flex-col py-2 sm:py-4">
       
-      <div className="flex-1 overflow-y-auto pb-4 space-y-6">
+      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto pb-4 sm:space-y-6">
         {/* System Message */}
-        <div className="flex gap-4">
+        <div className="flex min-w-0 gap-3 sm:gap-4">
           <div className="w-8 h-8 rounded-full bg-[#111720] border border-[#19212C] flex items-center justify-center flex-shrink-0 text-[#00A8FF] font-bold text-xs">
             A
           </div>
-          <div className="pt-1">
+          <div className="min-w-0 pt-1">
             <p className="text-slate-300 text-sm leading-relaxed">
               Tell us about your work and experience. 
               <br/>
@@ -168,12 +168,12 @@ export default function InterviewPage() {
         </div>
 
         {conversation.map((turn, index) => (
-          <div key={index} className={`flex gap-4 ${turn.role === 'beneficiary' ? 'justify-end' : ''}`}>
+          <div key={index} className={`flex min-w-0 gap-3 sm:gap-4 ${turn.role === 'beneficiary' ? 'justify-end' : ''}`}>
             {turn.role === 'assistant' && (
               <div className="w-8 h-8 rounded-full bg-[#111720] border border-[#19212C] flex items-center justify-center flex-shrink-0 text-[#00A8FF] font-bold text-xs">A</div>
             )}
-            <div className={`max-w-xl rounded-md border p-4 text-sm leading-relaxed ${turn.role === 'beneficiary' ? 'bg-[#151B24] border-[#2D3748] text-slate-200' : 'bg-[#0B0F14] border-[#19212C] text-slate-300'}`}>
-              <p>{turn.text}</p>
+            <div className={`min-w-0 max-w-[calc(100%-2.75rem)] rounded-md border p-3 text-sm leading-relaxed sm:max-w-xl sm:p-4 ${turn.role === 'beneficiary' ? 'bg-[#151B24] border-[#2D3748] text-slate-200' : 'bg-[#0B0F14] border-[#19212C] text-slate-300'}`}>
+              <p className="break-words">{turn.text}</p>
               {turn.response && (
                 <div className="mt-4 space-y-3">
                   {turn.response.questions.length === 0 && <InterviewSummary response={turn.response} />}
@@ -195,7 +195,7 @@ export default function InterviewPage() {
 
         {conversation.length === 0 && <div className="flex gap-4">
           <div className="w-8 h-8 flex-shrink-0"></div>
-          <div className="flex flex-col gap-2 w-full max-w-xl">
+          <div className="flex w-full max-w-xl flex-col gap-2">
             {demoPresets.map((preset, i) => (
               <button 
                 key={i}
@@ -211,22 +211,22 @@ export default function InterviewPage() {
       </div>
 
       {/* Input Area */}
-      <div className="mt-auto border-t border-[#19212C] pt-4 bg-[#07090D]">
+        <div className="mt-auto border-t border-[#19212C] bg-[#07090D] pt-3 pb-[env(safe-area-inset-bottom)] sm:pt-4">
         <form onSubmit={handleSubmit} className="relative">
           <div className={`relative rounded-xl border transition-colors bg-[#0B0F14] ${isListening ? 'border-[#00A8FF] shadow-[0_0_15px_rgba(0,168,255,0.1)]' : 'border-[#19212C] focus-within:border-[#2D3748]'}`}>
             <textarea
-              className="w-full bg-transparent p-4 pb-14 text-slate-200 focus:outline-none resize-none min-h-[120px] text-sm"
+              className="min-h-[112px] w-full resize-none bg-transparent p-3 pb-14 text-base text-slate-200 focus:outline-none sm:min-h-[120px] sm:p-4 sm:pb-14 sm:text-sm"
               placeholder="Speak or type beneficiary statement..."
               value={text}
               onChange={(e) => setText(e.target.value)}
               disabled={loading || isListening}
             />
             
-            <div className="absolute bottom-3 left-3 right-3 flex justify-between items-center">
+            <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
               <button
                 type="button"
                 onClick={startListening}
-                className={`w-8 h-8 flex items-center justify-center rounded-md transition-all focus:outline-none ${
+                className={`flex h-10 w-10 items-center justify-center rounded-md transition-all focus:outline-none ${
                   isListening 
                     ? 'bg-[#00A8FF] text-[#07090D] animate-pulse shadow-[0_0_10px_rgba(0,168,255,0.5)]' 
                     : 'bg-[#151B24] text-slate-400 hover:text-[#00A8FF] hover:bg-[#1A2332]'
@@ -239,7 +239,7 @@ export default function InterviewPage() {
               <button
                 type="submit"
                 disabled={loading || isListening || !text.trim()}
-                className="bg-[#00A8FF] hover:bg-[#0090DF] disabled:bg-[#151B24] disabled:text-slate-500 text-[#07090D] font-semibold py-1.5 px-4 rounded-md text-sm transition-colors flex justify-center items-center"
+                className="flex min-h-10 items-center justify-center rounded-md bg-[#00A8FF] px-4 py-1.5 text-sm font-semibold text-[#07090D] transition-colors hover:bg-[#0090DF] disabled:bg-[#151B24] disabled:text-slate-500"
               >
                 {loading ? 'Thinking...' : 'Send'}
               </button>

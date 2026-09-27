@@ -54,8 +54,8 @@ export default function PathwayDetailPage() {
 
       <div className="bg-[#0B0F14] rounded-xl border border-[#19212C] overflow-hidden mb-6">
         
-        <div className="p-6 border-b border-[#19212C] bg-[#07090D] flex flex-col md:flex-row md:justify-between md:items-start gap-4">
-          <div>
+        <div className="flex flex-col gap-4 border-b border-[#19212C] bg-[#07090D] p-4 sm:p-6 md:flex-row md:items-start md:justify-between">
+          <div className="min-w-0">
             <h1 className="text-xl font-bold text-white leading-tight mb-3">{candidate.pathway_name}</h1>
             <div className="flex flex-wrap items-center gap-2 text-[11px] font-mono text-slate-400">
               <span className="bg-[#111720] px-2 py-1 rounded border border-[#19212C]">QP: {candidate.qp_code}</span>
@@ -66,7 +66,7 @@ export default function PathwayDetailPage() {
           <ProvenanceBadge origin={candidate.provenance.origin} />
         </div>
 
-        <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 gap-8 p-4 sm:p-6 md:grid-cols-2">
             
           {/* WHY THIS PATHWAY */}
           <div>
@@ -144,12 +144,12 @@ export default function PathwayDetailPage() {
 
       {/* HUMAN DECISION */}
       <div className="bg-[#111720] p-6 rounded-xl border border-[#19212C]">
-        <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+        <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
           <div>
             <h2 className="text-sm font-bold text-white mb-1">Human Decision</h2>
             <p className="text-slate-500 text-xs">Review candidate profile and evidence before proceeding.</p>
           </div>
-          <div className="flex gap-3 w-full md:w-auto">
+          <div className="flex w-full flex-col gap-3 sm:flex-row md:w-auto">
             <button 
               onClick={() => handleDecision('interested')}
               disabled={saving}

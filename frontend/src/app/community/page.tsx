@@ -30,11 +30,11 @@ export default function CommunityDashboardPage() {
       <div className="flex flex-col md:flex-row md:justify-between md:items-end gap-6 mb-8 border-b border-[#19212C] pb-6">
         <div>
           <h1 className="text-2xl font-bold text-white mb-2">Community Intelligence</h1>
-          <p className="text-sm text-slate-400 font-mono">
+          <p className="flex flex-wrap gap-x-2 gap-y-1 text-sm text-slate-400 font-mono">
             District: <span className="text-slate-300">{data.district}</span> &nbsp;|&nbsp; Period: <span className="text-slate-300">{data.data_period}</span>
           </p>
         </div>
-        <div className="flex flex-col items-end gap-3">
+        <div className="flex flex-col items-start gap-3 md:items-end">
           <Link href="/community/evidence-brief" className="bg-[#111720] hover:bg-[#151B24] border border-[#19212C] text-slate-200 font-medium py-2 px-5 rounded-md text-sm transition-colors flex items-center gap-2">
             <svg className="w-4 h-4 text-[#00A8FF]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
             Evidence Brief
@@ -95,7 +95,7 @@ export default function CommunityDashboardPage() {
               </div>
             </div>
             
-            <div className="flex gap-6 w-full md:w-auto items-center justify-between md:justify-end">
+            <div className="flex w-full flex-wrap items-center justify-between gap-4 md:w-auto md:flex-nowrap md:justify-end md:gap-6">
               <div className="text-right">
                 <p className="text-[10px] text-slate-500 uppercase font-semibold tracking-wider">Interest</p>
                 <p className="text-xl font-light text-slate-300">{p.observed_interest_count}</p>
@@ -104,7 +104,7 @@ export default function CommunityDashboardPage() {
                 <p className="text-[10px] text-slate-500 uppercase font-semibold tracking-wider">Capacity</p>
                 <p className="text-xl font-light text-slate-300">{p.training_capacity}</p>
               </div>
-              <div className="text-right bg-[#111720] px-4 py-3 rounded-md border border-[#19212C] min-w-[130px]">
+              <div className="min-w-[110px] bg-[#111720] px-3 py-3 text-right rounded-md border border-[#19212C] sm:min-w-[130px] sm:px-4">
                 <p className="text-[10px] text-slate-500 uppercase font-semibold tracking-wider mb-1">Mismatch</p>
                 <p className={`text-sm font-medium ${p.interest_capacity_gap > 20 ? 'text-[#F43F5E]' : p.interest_capacity_gap < -20 ? 'text-[#00A8FF]' : 'text-[#10B981]'}`}>
                   {p.mismatch_status}

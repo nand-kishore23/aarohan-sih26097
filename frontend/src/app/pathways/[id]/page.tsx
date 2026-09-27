@@ -56,7 +56,7 @@ export default function PathwaysListPage() {
               key={pathway.id}
               className="block bg-[#0B0F14] rounded-xl border border-[#19212C] hover:border-[#00A8FF] hover:bg-[#111720] transition-all p-6 group"
             >
-              <div className="flex justify-between items-start mb-4">
+              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <h2 className="text-lg font-bold text-slate-200 group-hover:text-[#00A8FF] transition-colors mb-2">
                     {pathway.pathway_name}
@@ -69,7 +69,7 @@ export default function PathwaysListPage() {
                 <ProvenanceBadge origin={pathway.provenance.origin} />
               </div>
 
-              <div className="grid grid-cols-2 gap-4 mt-6">
+              <div className="mt-6 grid gap-4 sm:grid-cols-2">
                 <div className="bg-[#07090D] p-3 rounded-md border border-[#151B24]">
                   <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">Supported By</span>
                   <div className="mt-1 text-sm font-medium text-[#38BDF8]">

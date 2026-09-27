@@ -91,7 +91,7 @@ export function Sidebar() {
       {/* Mobile header */}
       <div className="md:hidden fixed top-0 left-0 right-0 h-14 bg-[#07090D] border-b border-[#19212C] flex items-center justify-between px-4 z-50">
         <AarohanBrand markSize={23} />
-        <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="text-slate-400 hover:text-white transition-colors p-1">
+        <button aria-label={isMobileMenuOpen ? 'Close navigation' : 'Open navigation'} onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="flex h-11 w-11 items-center justify-center text-slate-400 hover:text-white transition-colors">
           {isMobileMenuOpen ? (
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
           ) : (

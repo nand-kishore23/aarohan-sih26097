@@ -21,9 +21,9 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#07090D] flex flex-col lg:flex-row relative overflow-hidden">
+    <div className="relative flex min-h-screen flex-col bg-[#07090D] lg:flex-row">
 
-      <div className="flex-1 flex flex-col justify-center px-8 md:px-16 lg:px-20 py-16 lg:py-0 relative z-10 border-b lg:border-b-0 lg:border-r border-[#19212C]">
+      <div className="relative z-10 flex flex-1 flex-col justify-center border-b border-[#19212C] px-5 py-12 sm:px-8 md:px-16 lg:border-b-0 lg:border-r lg:px-20 lg:py-0">
         <div className="relative z-10 max-w-lg">
           <AarohanBrand className="mb-14" />
 
@@ -40,14 +40,14 @@ export default function LoginPage() {
       </div>
 
       {/* ─── RIGHT: Entry Panel ─── */}
-      <div className="w-full lg:w-[420px] flex-shrink-0 flex items-center justify-center px-6 py-16 lg:py-0 lg:border-l lg:border-[#19212C] bg-[#0B0F14]/50">
+      <div className="flex w-full flex-shrink-0 items-center justify-center bg-[#0B0F14]/50 px-5 py-12 sm:px-6 lg:w-[420px] lg:border-l lg:border-[#19212C] lg:py-0">
         <div className="w-full max-w-sm">
 
           <div className="flex flex-col items-center mb-8 lg:hidden">
             <AarohanBrand />
           </div>
 
-          <div className="bg-[#111720] p-8 rounded-lg border border-[#19212C]">
+          <div className="rounded-lg border border-[#19212C] bg-[#111720] p-5 sm:p-8">
 
             <h2 className="text-lg font-semibold text-white mb-1">Enter AAROHAN</h2>
             <p className="text-xs text-slate-500 mb-8">Voice-first livelihood intelligence for beneficiaries and community planning.</p>
@@ -57,7 +57,7 @@ export default function LoginPage() {
                 <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-2">Email</label>
                 <input
                   type="email"
-                  className="w-full bg-[#07090D] border border-[#19212C] rounded-md px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#00A8FF] transition-colors placeholder:text-slate-600"
+                  className="w-full bg-[#07090D] border border-[#19212C] rounded-md px-4 py-2.5 text-base text-slate-200 focus:outline-none focus:border-[#00A8FF] transition-colors placeholder:text-slate-600 sm:text-sm"
                   placeholder="demo@aarohan.local"
                 />
               </div>
@@ -65,7 +65,7 @@ export default function LoginPage() {
                 <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-2">Password</label>
                 <input
                   type="password"
-                  className="w-full bg-[#07090D] border border-[#19212C] rounded-md px-4 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-[#00A8FF] transition-colors placeholder:text-slate-600"
+                  className="w-full bg-[#07090D] border border-[#19212C] rounded-md px-4 py-2.5 text-base text-slate-200 focus:outline-none focus:border-[#00A8FF] transition-colors placeholder:text-slate-600 sm:text-sm"
                   placeholder="••••••••"
                 />
               </div>
